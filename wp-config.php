@@ -28,7 +28,7 @@ define('DB_USER', 'test_play2c_5334');
 define('DB_PASSWORD', '7dk99SpTCVNxbP7PBW13');
 
 /** Adresse de l’hébergement MySQL. */
-define('DB_HOST', 'mysql://test-play2c-5334.mysql.dbs.appsdeck.eu:30973/test_play2c_5334');
+define('DB_HOST', 'test-play2c-5334.mysql.dbs.appsdeck.eu:30973/test_play2c_5334');
 
 /** Jeu de caractères à utiliser par la base de données lors de la création des tables. */
 define('DB_CHARSET', 'utf8');
