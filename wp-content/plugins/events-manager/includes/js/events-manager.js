@@ -874,7 +874,7 @@ function em_maps_load_locations(el){
 					var marker = new google.maps.Marker(marker_options);
 					maps_markers[map_id].push(marker);
 					marker.setTitle(data[i].location_name);
-					var myContent = '<div class="em-map-balloon"><div id="em-map-balloon-'+map_id+'" class="em-map-balloon-content">'+ data[i].location_balloon +'</div></div>';
+					var myContent = ''; //<div class="em-map-balloon"><div id="em-map-balloon-'+map_id+'" class="em-map-balloon-content">'+ data[i].location_balloon +'</div></div>';
 					em_map_infobox(marker, myContent, maps[map_id]);
 					
 					//Get min and max long/lats
