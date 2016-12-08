@@ -917,13 +917,13 @@ function em_maps_load_location(el){
 	};
 	jQuery(document).triggerHandler('em_maps_location_marker_options', marker_options);
 	maps_markers[map_id] = new google.maps.Marker(marker_options);
-	infowindow = new google.maps.InfoWindow({ content: jQuery('#em-location-map-info-'+map_id+' .em-map-balloon').get(0) });
-	infowindow.open(maps[map_id],maps_markers[map_id]);
-	maps[map_id].panBy(40,-70);
+	//infowindow = new google.maps.InfoWindow({ content: jQuery('#em-location-map-info-'+map_id+' .em-map-balloon').get(0) });
+	//infowindow.open(maps[map_id],maps_markers[map_id]);
+	//maps[map_id].panBy(40,-70);
 	
 	//JS Hook for handling map after instantiation
 	//Example hook, which you can add elsewhere in your theme's JS - jQuery(document).bind('em_maps_location_hook', function(){ alert('hi');} );
-	jQuery(document).triggerHandler('em_maps_location_hook', [maps[map_id], infowindow, maps_markers[map_id], map_id]);
+	jQuery(document).triggerHandler('em_maps_location_hook', [maps[map_id], maps_markers[map_id], map_id]); //infowindow
 	//map resize listener
 	jQuery(window).on('resize', function(e) {
 		google.maps.event.trigger(maps[map_id], "resize");
@@ -960,7 +960,7 @@ function em_maps() {
 				google.maps.event.trigger(map, 'resize');
 				map.setCenter(position);
 				map.panBy(40,-55);
-				infoWindow.setContent( 
+				/*infoWindow.setContent( 
 					'<div id="location-balloon-content"><strong>' + 
 					mapTitle + 
 					'</strong><br/>' + 
@@ -969,7 +969,7 @@ function em_maps() {
 					'</div>'
 				);
 				infoWindow.open(map, marker);
-				jQuery(document).triggerHandler('em_maps_location_hook', [map, infowindow, marker, 0]);
+				jQuery(document).triggerHandler('em_maps_location_hook', [map, infowindow, marker, 0]);*/
 			} else {
     			jQuery('#em-map').hide();
     			jQuery('#em-map-404').show();
@@ -989,10 +989,10 @@ function em_maps() {
 						jQuery('#em-map-404').hide();
 						map.setCenter(loc_latlng);
 						map.panBy(40,-55);
-						infoWindow.setContent( '<div id="location-balloon-content">'+ data.location_balloon +'</div>');
-						infoWindow.open(map, marker);
+						/*infoWindow.setContent( '<div id="location-balloon-content">'+ data.location_balloon +'</div>');
+						infoWindow.open(map, marker);*/
 						google.maps.event.trigger(map, 'resize');
-						jQuery(document).triggerHandler('em_maps_location_hook', [map, infowindow, marker, 0]);
+						jQuery(document).triggerHandler('em_maps_location_hook', [map, marker, 0]); // infowindow
 					}else{
 						jQuery('#em-map').hide();
 						jQuery('#em-map-404').show();
@@ -1048,10 +1048,10 @@ function em_maps() {
 			    content: ''
 			});
 			var geocoder = new google.maps.Geocoder();
-			google.maps.event.addListener(infoWindow, 'domready', function() { 
+			/*google.maps.event.addListener(infoWindow, 'domready', function() { 
 				document.getElementById('location-balloon-content').parentNode.style.overflow=''; 
 				document.getElementById('location-balloon-content').parentNode.parentNode.style.overflow=''; 
-			});
+			});*/
 			google.maps.event.addListener(marker, 'dragend', function() {
 				var position = marker.getPosition();
 				jQuery('#location-latitude').val(position.lat());
