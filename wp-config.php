@@ -90,6 +90,7 @@ define('WP_DEBUG', false);
 if ( !defined('ABSPATH') )
 	define('ABSPATH', dirname(__FILE__) . '/');
 
+define('WPCACHEHOME', dirname(__FILE__) . '/wp-content/plugins/wp-super-cache/datas/');
 define('WP_CACHE', true);
 
 /** Réglage des variables de WordPress et de ses fichiers inclus. */
