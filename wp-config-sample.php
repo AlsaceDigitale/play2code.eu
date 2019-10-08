@@ -66,7 +66,7 @@ define('NONCE_SALT',       'put your unique phrase here');
  * si vous leur donnez chacune un préfixe unique.
  * N’utilisez que des chiffres, des lettres non-accentuées, et des caractères soulignés !
  */
-$table_prefix = 'wp_';
+$table_prefix  = 'wp_';
 
 /**
  * Pour les développeurs : le mode déboguage de WordPress.
@@ -77,14 +77,14 @@ $table_prefix = 'wp_';
  * de thèmes se servent de WP_DEBUG dans leur environnement de
  * développement.
  *
- * Pour plus d’information sur les autres constantes qui peuvent être utilisées
+ * Pour plus d'information sur les autres constantes qui peuvent être utilisées
  * pour le déboguage, rendez-vous sur le Codex.
  *
  * @link https://codex.wordpress.org/Debugging_in_WordPress
  */
 define('WP_DEBUG', false);
 
-/* C’est tout, ne touchez pas à ce qui suit ! Bonne publication. */
+/* C’est tout, ne touchez pas à ce qui suit ! */
 
 /** Chemin absolu vers le dossier de WordPress. */
 if ( !defined('ABSPATH') )
