@@ -60,9 +60,6 @@ class EM_Event extends EM_Object{
 	var $event_status;
 	var $blog_id;
 	var $group_id;
-	/*** Populated with the non-hidden event post custom fields (i.e. not starting with _) 
-	 * @var array
-	 */
 	var $event_attributes = array();
 	/* Recurring Specific Values */
 	var $recurrence;
