@@ -95,3 +95,5 @@ define('WP_CACHE', true);
 
 /** Réglage des variables de WordPress et de ses fichiers inclus. */
 require_once(ABSPATH . 'wp-settings.php');
+
+if( !defined('WPMU_PLUGIN_DIR') ) define( 'WPMU_PLUGIN_DIR', dirname(__FILE__).'/wp-content/wp-safe-mode' ); //WP Safe Mode
