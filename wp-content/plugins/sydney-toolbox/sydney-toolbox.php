@@ -10,7 +10,7 @@
  * Plugin Name:       Sydney Toolbox
  * Plugin URI:        http://athemes.com/plugins/sydney-toolbox
  * Description:       Registers custom post types and custom fields for the Sydney theme
- * Version:           1.01
+ * Version:           1.05
  * Author:            aThemes
  * Author URI:        http://athemes.com
  * License:           GPL-2.0+
@@ -40,6 +40,12 @@ class Sydney_Toolbox {
 		add_action( 'plugins_loaded', array( $this, 'i18n' ), 3 );
 		add_action( 'plugins_loaded', array( $this, 'includes' ), 4 );
 		add_action( 'admin_notices', array( $this, 'admin_notice' ), 4 );
+		
+		//Elementor actions
+		add_action( 'elementor/widgets/widgets_registered', array( $this, 'elementor_includes' ), 4 );
+		add_action( 'elementor/init', array( $this, 'elementor_category' ), 4 );
+		add_action( 'elementor/frontend/after_register_scripts', array( $this, 'scripts' ), 4 );
+
 	}
 
 	/**
@@ -56,22 +62,58 @@ class Sydney_Toolbox {
 	 */
 	function includes() {
 
-		//Post types
-		require_once( ST_DIR . 'inc/post-type-services.php' );
-		require_once( ST_DIR . 'inc/post-type-employees.php' );
-		require_once( ST_DIR . 'inc/post-type-testimonials.php' );	
-		require_once( ST_DIR . 'inc/post-type-clients.php' );
-		require_once( ST_DIR . 'inc/post-type-projects.php' );
-		require_once( ST_DIR . 'inc/post-type-timeline.php' );		
-		//Metaboxes
-		require_once( ST_DIR . 'inc/metaboxes/services-metabox.php' );	
-		require_once( ST_DIR . 'inc/metaboxes/employees-metabox.php' );	
-		require_once( ST_DIR . 'inc/metaboxes/testimonials-metabox.php' );
-		require_once( ST_DIR . 'inc/metaboxes/clients-metabox.php' );
-		require_once( ST_DIR . 'inc/metaboxes/projects-metabox.php' );
-		require_once( ST_DIR . 'inc/metaboxes/timeline-metabox.php' );
-		require_once( ST_DIR . 'inc/metaboxes/singles-metabox.php' );
+		if ( defined( 'SITEORIGIN_PANELS_VERSION' ) ) {
+			//Post types
+			require_once( ST_DIR . 'inc/post-type-services.php' );
+			require_once( ST_DIR . 'inc/post-type-employees.php' );
+			require_once( ST_DIR . 'inc/post-type-testimonials.php' );	
+			require_once( ST_DIR . 'inc/post-type-clients.php' );
+			require_once( ST_DIR . 'inc/post-type-projects.php' );
+			require_once( ST_DIR . 'inc/post-type-timeline.php' );		
+			//Metaboxes
+			require_once( ST_DIR . 'inc/metaboxes/services-metabox.php' );	
+			require_once( ST_DIR . 'inc/metaboxes/employees-metabox.php' );	
+			require_once( ST_DIR . 'inc/metaboxes/testimonials-metabox.php' );
+			require_once( ST_DIR . 'inc/metaboxes/clients-metabox.php' );
+			require_once( ST_DIR . 'inc/metaboxes/projects-metabox.php' );
+			require_once( ST_DIR . 'inc/metaboxes/timeline-metabox.php' );
+			require_once( ST_DIR . 'inc/metaboxes/singles-metabox.php' );
+		}
 	}
+
+	function elementor_includes() {
+		if ( !version_compare(PHP_VERSION, '5.4', '<=') ) {
+			require_once( ST_DIR . 'inc/elementor/block-testimonials.php' );
+			require_once( ST_DIR . 'inc/elementor/block-posts.php' );
+			require_once( ST_DIR . 'inc/elementor/block-portfolio.php' );
+			require_once( ST_DIR . 'inc/elementor/block-employee-carousel.php' );			
+
+			if ( $this->is_pro() ) {
+				require_once( ST_DIR . 'inc/elementor/block-employee.php' );
+				require_once( ST_DIR . 'inc/elementor/block-pricing.php' );
+				require_once( ST_DIR . 'inc/elementor/block-timeline.php' );
+			}
+		}
+	}
+
+	function elementor_category() {
+		if ( !version_compare(PHP_VERSION, '5.4', '<=') ) {
+			\Elementor\Plugin::$instance->elements_manager->add_category( 
+				'sydney-elements',
+				[
+					'title' => __( 'Sydney Elements', 'sydney-toolbox' ),
+					'icon' => 'fa fa-plug',
+				],
+				2
+			);
+		}
+	} 
+
+	static function install() {
+		if ( version_compare(PHP_VERSION, '5.4', '<=') ) {
+			wp_die( __( 'Sydney Toolbox requires PHP 5.4. Please contact your host to upgrade your PHP. The plugin was <strong>not</strong> activated.', 'sydney-toolbox' ) );
+		};
+	}	
 
 	/**
 	 * Translations
@@ -94,6 +136,27 @@ class Sydney_Toolbox {
 	}
 
 	/**
+	 * Scripts
+	 */	
+	function scripts() {
+		wp_enqueue_script( 'st-carousel', ST_URI . 'js/main.js', array(), '20180228', true );
+
+	}
+
+	/**
+	 * Get current theme
+	 */
+	public static function is_pro() {
+		$theme  = wp_get_theme();
+		$parent = wp_get_theme()->parent();
+		if ( ( $theme != 'Sydney Pro' ) && ( $parent != 'Sydney Pro') ) {
+			return false;
+	    } else {
+	    	return true;
+	    }		
+	}
+
+	/**
 	 * Returns the instance.
 	 */
 	public static function get_instance() {
@@ -106,7 +169,9 @@ class Sydney_Toolbox {
 }
 
 function sydney_toolbox_plugin() {
-	if ( !function_exists('wpcf_init') ) //Make sure the Types plugin isn't active
 		return Sydney_Toolbox::get_instance();
 }
 add_action('plugins_loaded', 'sydney_toolbox_plugin', 1);
+
+//Does not activate the plugin on PHP less than 5.4
+register_activation_hook( __FILE__, array( 'Sydney_Toolbox', 'install' ) );

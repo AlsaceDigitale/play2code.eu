@@ -4,6 +4,7 @@ Widget Name: Call-To-Action
 Description: A simple call-to-action widget. You can do what ever you want with a call-to-action widget.
 Author: SiteOrigin
 Author URI: https://siteorigin.com
+Documentation: https://siteorigin.com/widgets-bundle/call-action-widget/
 */
 
 class SiteOrigin_Widget_Cta_Widget extends SiteOrigin_Widget {
@@ -80,6 +81,19 @@ class SiteOrigin_Widget_Cta_Widget extends SiteOrigin_Widget {
 						'type' => 'color',
 						'label' => __('Border color', 'so-widgets-bundle'),
 					),
+					'use_default_background' => array(
+						'type' => 'checkbox',
+						'label' => __( 'Use default background colors', 'so-widgets-bundle' ),
+						'default' => true,
+					),
+					'title_color' => array(
+						'type' => 'color',
+						'label' => __('Title color', 'so-widgets-bundle'),
+					),
+					'subtitle_color' => array(
+						'type' => 'color',
+						'label' => __('Subtitle color', 'so-widgets-bundle'),
+					),
 					'button_align' => array(
 						'type' => 'select',
 						'label' => __( 'Button align', 'so-widgets-bundle' ),
@@ -102,11 +116,15 @@ class SiteOrigin_Widget_Cta_Widget extends SiteOrigin_Widget {
 	}
 
 	function get_less_variables($instance) {
-		if( empty( $instance ) ) return array();
+		if ( empty( $instance ) || empty( $instance['design'] ) ) {
+			return array();
+		}
 
 		return array(
 			'border_color' => $instance['design']['border_color'],
 			'background_color' => $instance['design']['background_color'],
+			'title_color'      => $instance['design']['title_color'],
+			'subtitle_color'   => $instance['design']['subtitle_color'],
 			'button_align' => $instance['design']['button_align'],
 		);
 	}
@@ -115,7 +133,32 @@ class SiteOrigin_Widget_Cta_Widget extends SiteOrigin_Widget {
 		unset( $child_widget_form['design']['fields']['align'] );
 		return $child_widget_form;
 	}
+	
+	function modify_instance( $instance ) {
+		if ( ! isset( $instance['design']['use_default_background'] ) ) {
+			$instance['design']['use_default_background'] = true;
+		}
+		
+		if ( ! empty( $instance['design']['use_default_background'] ) ) {
+			if ( empty( $instance['design']['background_color'] ) ) {
+				$instance['design']['background_color'] = '#F8F8F8';
+			}
+			if ( empty( $instance['design']['border_color'] ) ) {
+				$instance['design']['border_color'] = '#E3E3E3';
+			}
+		}
+		
+		return $instance;
+	}
 
+	function get_form_teaser(){
+		if( class_exists( 'SiteOrigin_Premium' ) ) return false;
+		return sprintf(
+			__( 'Get more font customization options with %sSiteOrigin Premium%s', 'so-widgets-bundle' ),
+			'<a href="https://siteorigin.com/downloads/premium/?featured_addon=plugin/cta" target="_blank" rel="noopener noreferrer">',
+			'</a>'
+		);
+	}
 }
 
 siteorigin_widget_register('sow-cta', __FILE__, 'SiteOrigin_Widget_Cta_Widget');

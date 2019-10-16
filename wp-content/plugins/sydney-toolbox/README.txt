@@ -2,8 +2,8 @@
 Contributors: athemes, vladff
 Tags: sydney, custom post types, custom fields
 Requires at least: 4.0
-Tested up to: 4.5
-Stable tag: 1.01
+Tested up to: 4.9.6
+Stable tag: 1.05
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -27,6 +27,15 @@ None yet.
 == Screenshots ==
 
 == Changelog ==
+
+= 1.04 =
+* Added PHP version check. Minimum required version is 5.4.
+
+= 1.03 =
+* Added Elementor blocks and support
+
+= 1.02 =
+* Updated version number
 
 = 1.01 =
 * Loading logic change for singles metabox

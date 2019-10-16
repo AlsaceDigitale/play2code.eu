@@ -2,9 +2,9 @@
 /*
 Plugin Name: SiteOrigin Widgets Bundle
 Description: A collection of all widgets, neatly bundled into a single plugin. It's also a framework to code your own widgets on top of.
-Version: 1.7.2
+Version: 1.15.8
 Text Domain: so-widgets-bundle
-Domain Path: /languages
+Domain Path: /lang
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 Plugin URI: https://siteorigin.com/widgets-bundle/
@@ -12,7 +12,7 @@ License: GPL3
 License URI: https://www.gnu.org/licenses/gpl-3.0.txt
 */
 
-define('SOW_BUNDLE_VERSION', '1.7.2');
+define('SOW_BUNDLE_VERSION', '1.15.8');
 define('SOW_BUNDLE_BASE_FILE', __FILE__);
 
 // Allow JS suffix to be pre-set
@@ -23,6 +23,9 @@ if( !defined( 'SOW_BUNDLE_JS_SUFFIX' ) ) {
 if( !function_exists('siteorigin_widget_get_plugin_path') ) {
 	include plugin_dir_path(__FILE__).'base/base.php';
 	include plugin_dir_path(__FILE__).'icons/icons.php';
+}
+if( ! class_exists('SiteOrigin_Widgets_Bundle_Compatibility') ) {
+	include_once plugin_dir_path( __FILE__ ) . 'compat/compat.php';
 }
 
 class SiteOrigin_Widgets_Bundle {
@@ -45,6 +48,7 @@ class SiteOrigin_Widgets_Bundle {
 		add_action('admin_init', array($this, 'admin_activate_widget') );
 		add_action('admin_menu', array($this, 'admin_menu_init') );
 		add_action('admin_enqueue_scripts', array($this, 'admin_enqueue_scripts') );
+		add_action('admin_enqueue_scripts', array($this, 'admin_register_scripts') );
 
 		// All the ajax actions
 		add_action('wp_ajax_so_widgets_bundle_manage', array($this, 'admin_ajax_manage_handler') );
@@ -63,7 +67,6 @@ class SiteOrigin_Widgets_Bundle {
 
 		add_action( 'admin_init', array($this, 'plugin_version_check') );
 		add_action( 'siteorigin_widgets_version_update', array( $this, 'handle_update' ), 10, 2 );
-		add_action( 'admin_notices', array( $this, 'display_admin_notices') );
 
 		// Actions for clearing widget cache
 		add_action( 'switch_theme', array($this, 'clear_widget_cache') );
@@ -77,6 +80,14 @@ class SiteOrigin_Widgets_Bundle {
 
 		add_filter( 'wp_enqueue_scripts', array($this, 'register_general_scripts') );
 		add_filter( 'wp_enqueue_scripts', array($this, 'enqueue_active_widgets_scripts') );
+		
+		// This is a temporary filter to disable the new Jetpack Grunion contact form editor.
+		add_filter( 'tmp_grunion_allow_editor_view', '__return_false' );
+
+		// Add compatibility for Autoptimize.
+		if ( class_exists('autoptimizeMain', false) ) {
+			add_filter( 'autoptimize_filter_css_exclude', array( $this, 'include_widgets_css_in_autoptimize'), 10, 2 );
+		}
 	}
 
 	/**
@@ -100,7 +111,7 @@ class SiteOrigin_Widgets_Bundle {
 	 * @action plugins_loaded
 	 */
 	function set_plugin_textdomain(){
-		load_plugin_textdomain('so-widgets-bundle', false, dirname( plugin_basename( __FILE__ ) ). '/languages/');
+		load_plugin_textdomain('so-widgets-bundle', false, dirname( plugin_basename( __FILE__ ) ). '/lang/');
 	}
 
 	/**
@@ -181,40 +192,6 @@ class SiteOrigin_Widgets_Bundle {
 			update_option( 'siteorigin_widgets_new_widgets', $new_widgets );
 			update_option( 'siteorigin_widgets_old_widgets', implode( ',', $widgets ) );
 		}
-	}
-
-	function display_admin_notices() {
-		$new_widgets = get_option( 'siteorigin_widgets_new_widgets' );
-		if ( empty( $new_widgets ) ) {
-			return;
-		}
-		?>
-		<div class="updated">
-			<p><?php echo __( 'New widgets available in the ') . '<a href="' . admin_url('plugins.php?page=so-widgets-plugins') . '">' . __('SiteOrigin Widgets Bundle', 'so-widgets-bundle' ) . '</a>!'; ?></p>
-			<?php
-
-			$default_headers = array(
-				'Name' => 'Widget Name',
-				'Description' => 'Description',
-				'Author' => 'Author',
-				'AuthorURI' => 'Author URI',
-				'WidgetURI' => 'Widget URI',
-				'VideoURI' => 'Video URI',
-			);
-
-			foreach ( $new_widgets as $widget_file_path ) {
-				preg_match( '/.*[\/\\\\](.*).php/', $widget_file_path, $match );
-				$widget = get_file_data( $widget_file_path, $default_headers, 'siteorigin-widget' );
-				$name = empty( $widget['Name'] ) ? $match[1] : $widget['Name'];
-				$description = empty( $widget['Description'] ) ? __( 'A new widget!', 'so-widgets-bundle' ) : $widget['Description'];
-				?>
-				<p><b><?php echo esc_html( $name . ' - ' . $description) ?></b></p>
-				<?php
-			}
-			?>
-		</div>
-		<?php
-		update_option( 'siteorigin_widgets_new_widgets', array() );
 	}
 
 	/**
@@ -304,13 +281,14 @@ class SiteOrigin_Widgets_Bundle {
 			'toggleUrl' => wp_nonce_url( admin_url('admin-ajax.php?action=so_widgets_bundle_manage'), 'manage_so_widget' )
 		) );
 	}
-
+	
 	/**
 	 * The fallback (from ajax) URL handler for activating or deactivating a widget
 	 */
 	function admin_activate_widget() {
 		if(
-			!empty($_GET['page'])
+			current_user_can( apply_filters( 'siteorigin_widgets_admin_menu_capability', 'manage_options' ) )
+			&& !empty($_GET['page'])
 			&& $_GET['page'] == 'so-widgets-plugins'
 			&& !empty( $_GET['widget_action'] ) && !empty( $_GET['widget'] )
 			&& isset($_GET['_wpnonce'])
@@ -335,24 +313,45 @@ class SiteOrigin_Widgets_Bundle {
 
 		}
 	}
-
+	
+	/**
+	 * Register some common scripts used in forms.
+	 */
+	function admin_register_scripts() {
+		wp_register_script(
+			'sowb-pikaday',
+			plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'js/lib/pikaday' . SOW_BUNDLE_JS_SUFFIX . '.js',
+			array( ),
+			'1.5.1'
+		);
+		wp_register_style(
+			'sowb-pikaday',
+			plugin_dir_url(__FILE__) . 'js/lib/pikaday.css'
+		);
+	}
+	
 	/**
 	 * Handler for activating and deactivating widgets.
 	 *
 	 * @action wp_ajax_so_widgets_bundle_manage
 	 */
 	function admin_ajax_manage_handler(){
-		if( !wp_verify_nonce($_GET['_wpnonce'], 'manage_so_widget') ) exit();
-		if( ! current_user_can( apply_filters( 'siteorigin_widgets_admin_menu_capability', 'manage_options' ) ) ) exit();
-		if( empty($_POST['widget']) ) exit();
+		if ( ! wp_verify_nonce( $_GET['_wpnonce'], 'manage_so_widget' ) ) {
+			wp_die( __( 'Invalid request.', 'so-widgets-bundle' ), 403 );
+		}
+		
+		if ( ! current_user_can( apply_filters( 'siteorigin_widgets_admin_menu_capability', 'manage_options' ) ) ) {
+			wp_die( __( 'Insufficient permissions.', 'so-widgets-bundle' ), 403 );
+		}
+		if ( empty( $_POST['widget'] ) ) {
+			wp_die( __( 'Invalid post.', 'so-widgets-bundle' ), 400 );
+		}
 
 		if( !empty($_POST['active']) ) $this->activate_widget($_POST['widget']);
 		else $this->deactivate_widget( $_POST['widget'] );
 
 		// Send a kind of dummy response.
-		header('content-type: application/json');
-		echo json_encode( array('done' => true) );
-		exit();
+		wp_send_json( array( 'done' => true ) );
 	}
 
 	/**
@@ -361,13 +360,22 @@ class SiteOrigin_Widgets_Bundle {
 	 * @action wp_ajax_so_widgets_setting_form
 	 */
 	function admin_ajax_settings_form(){
-		if( ! wp_verify_nonce($_GET['_wpnonce'], 'display-widget-form') ) exit();
-		if( ! current_user_can( apply_filters( 'siteorigin_widgets_admin_menu_capability', 'manage_options' ) ) ) exit();
+		if ( ! wp_verify_nonce( $_GET['_wpnonce'], 'display-widget-form' ) ) {
+			wp_die( __( 'Invalid request.', 'so-widgets-bundle' ), 403 );
+		}
+		if ( ! current_user_can( apply_filters( 'siteorigin_widgets_admin_menu_capability', 'manage_options' ) ) ) {
+			wp_die( __( 'Insufficient permissions.', 'so-widgets-bundle' ), 403 );
+		}
 
 		$widget_objects = $this->get_widget_objects();
-		$widget_object = !empty( $widget_objects[ $_GET['id'] ] ) ? $widget_objects[ $_GET['id'] ] : false;
 
-		if( empty( $widget_object ) || ! $widget_object->has_form( 'settings' ) ) exit();
+		$widget_path = empty( $_GET['id'] ) ? false : wp_normalize_path( WP_CONTENT_DIR ) . $_GET['id'];
+
+		$widget_object = empty( $widget_objects[ $widget_path ] ) ? false : $widget_objects[ $widget_path ];
+		
+		if ( empty( $widget_object ) || ! $widget_object->has_form( 'settings' ) ) {
+			wp_die( __( 'Invalid request.', 'so-widgets-bundle' ), 400 );
+		}
 
 		unset( $widget_object->widget_options['has_preview'] );
 
@@ -385,8 +393,8 @@ class SiteOrigin_Widgets_Bundle {
 			<?php $widget_object->form( $value, 'settings' ) ?>
 		</form>
 		<?php
-
-		exit();
+		
+		wp_die();
 	}
 
 	/**
@@ -395,16 +403,25 @@ class SiteOrigin_Widgets_Bundle {
 	 * @action wp_ajax_so_widgets_setting_save
 	 */
 	function admin_ajax_settings_save(){
-		if( ! wp_verify_nonce( $_GET['_wpnonce'], 'save-widget-settings' ) ) exit();
-		if( ! current_user_can( apply_filters( 'siteorigin_widgets_admin_menu_capability', 'manage_options' ) ) ) exit();
+		if ( ! wp_verify_nonce( $_GET['_wpnonce'], 'save-widget-settings' ) ) {
+			wp_die( __( 'Invalid request.', 'so-widgets-bundle' ), 403 );
+		}
+		if ( ! current_user_can( apply_filters( 'siteorigin_widgets_admin_menu_capability', 'manage_options' ) ) ) {
+			wp_die( __( 'Insufficient permissions.', 'so-widgets-bundle' ), 403 );
+		}
 
 		$widget_objects = $this->get_widget_objects();
-		$widget_object = !empty( $widget_objects[ $_GET['id'] ] ) ? $widget_objects[ $_GET['id'] ] : false;
-
-		if( empty( $widget_object ) || ! $widget_object->has_form( 'settings' ) ) exit();
+		$widget_path = empty( $_GET['id'] ) ? false : wp_normalize_path( WP_CONTENT_DIR ) . $_GET['id'];
+		$widget_object = empty( $widget_objects[ $widget_path ] ) ? false : $widget_objects[ $widget_path ];
+		
+		if ( empty( $widget_object ) || ! $widget_object->has_form( 'settings' ) ) {
+			wp_die( __( 'Invalid request.', 'so-widgets-bundle' ), 400 );
+		}
 
 		$form_values = array_shift( array_shift( array_values( $_POST ) ) );
 		$widget_object->save_global_settings( $form_values );
+		
+		wp_send_json_success();
 	}
 
 	/**
@@ -462,19 +479,25 @@ class SiteOrigin_Widgets_Bundle {
 	 * Get javascript variables for admin.
 	 */
 	function admin_ajax_get_javascript_variables() {
-		if ( empty( $_REQUEST['_widgets_nonce'] ) || !wp_verify_nonce( $_REQUEST['_widgets_nonce'], 'widgets_action' ) ) return;
-		$result = array();
+		if ( empty( $_REQUEST['_widgets_nonce'] ) ||
+		     ! wp_verify_nonce( $_REQUEST['_widgets_nonce'], 'widgets_action' ) ) {
+			wp_die( __( 'Invalid request.', 'so-widgets-bundle' ), 403 );
+		}
+		
 		$widget_class = $_POST['widget'];
 		global $wp_widget_factory;
-		if ( ! empty( $wp_widget_factory->widgets[ $widget_class ] ) ) {
-			$widget = $wp_widget_factory->widgets[ $widget_class ];
-			if( method_exists( $widget, 'get_javascript_variables' ) ) $result = $widget->get_javascript_variables();
+		if ( empty( $wp_widget_factory->widgets[ $widget_class ] ) ) {
+			wp_die( __( 'Invalid post.', 'so-widgets-bundle' ), 400 );
 		}
-
-		header('content-type: application/json');
-		echo json_encode($result);
-
-		exit();
+		
+		$widget = $wp_widget_factory->widgets[ $widget_class ];
+		if ( ! method_exists( $widget, 'get_javascript_variables' ) ) {
+			wp_die( __( 'Invalid request.', 'so-widgets-bundle' ), 400 );
+		}
+		
+		$result = $widget->get_javascript_variables();
+		
+		wp_send_json( $result );
 	}
 
 	/**
@@ -487,7 +510,8 @@ class SiteOrigin_Widgets_Bundle {
 	 */
 	function activate_widget( $widget_id, $include = true ){
 		$exists = false;
-		foreach( $this->widget_folders as $folder ) {
+		$widget_folders = $this->get_widget_folders();
+		foreach( $widget_folders as $folder ) {
 			if( !file_exists($folder . $widget_id . '/' . $widget_id . '.php') ) continue;
 			$exists = true;
 		}
@@ -507,7 +531,7 @@ class SiteOrigin_Widgets_Bundle {
 		// Now, lets actually include the files
 		include_once( ABSPATH . 'wp-admin/includes/plugin.php' );
 
-		foreach( $this->widget_folders as $folder ) {
+		foreach( $widget_folders as $folder ) {
 			if( !file_exists($folder . $widget_id . '/' . $widget_id . '.php') ) continue;
 			include_once $folder . $widget_id . '/' . $widget_id . '.php';
 
@@ -564,6 +588,7 @@ class SiteOrigin_Widgets_Bundle {
 			'AuthorURI' => 'Author URI',
 			'WidgetURI' => 'Widget URI',
 			'VideoURI' => 'Video URI',
+			'Documentation' => 'Documentation',
 		);
 
 		$widgets = array();
@@ -576,6 +601,11 @@ class SiteOrigin_Widgets_Bundle {
 				if ( empty( $widget['Name'] ) ) {
 					continue;
 				}
+
+				foreach ( array( 'Name', 'Description' ) as $field ) {
+					$widget[ $field ] = translate( $widget[ $field ], 'so-widgets-bundle' );
+				}
+
 				$f = pathinfo($file);
 				$id = $f['filename'];
 
@@ -604,8 +634,9 @@ class SiteOrigin_Widgets_Bundle {
 
 		foreach( $folders as $folder ) {
 
-			$files = glob( $folder . '*/*.php' );
+			$files = glob( wp_normalize_path( $folder ) . '*/*.php' );
 			foreach ($files as $file) {
+				$file = wp_normalize_path( $file );
 				include_once $file;
 
 				$widget_class = $manager->get_class_from_path( $file );
@@ -640,21 +671,16 @@ class SiteOrigin_Widgets_Bundle {
 	 *
 	 * @action siteorigin_panels_data
 	 */
-	function load_missing_widgets($data){
+	function load_missing_widgets( $data ){
 		if(empty($data['widgets'])) return $data;
 
 		global $wp_widget_factory;
 
 		foreach($data['widgets'] as $widget) {
-			if( empty($widget['panels_info']['class']) ) continue;
-			if( !empty($wp_widget_factory->widgets[$widget['panels_info']['class']] ) ) continue;
+			if( empty( $widget['panels_info']['class'] ) ) continue;
+			if( !empty( $wp_widget_factory->widgets[ $widget['panels_info']['class'] ] ) ) continue;
 
-			$class = $widget['panels_info']['class'];
-			if( preg_match('/SiteOrigin_Widget_([A-Za-z]+)_Widget/', $class, $matches) ) {
-				$name = $matches[1];
-				$id = strtolower( implode( '-', array_filter( preg_split( '/(?=[A-Z])/', $name ) ) ) );
-				$this->activate_widget($id, true);
-			}
+			$this->load_missing_widget( false, $widget['panels_info']['class'] );
 		}
 
 		return $data;
@@ -668,13 +694,19 @@ class SiteOrigin_Widgets_Bundle {
 	 *
 	 * @return
 	 */
-	function load_missing_widget($the_widget, $class){
+	function load_missing_widget( $the_widget, $class ){
 		// We only want to worry about missing widgets
-		if( !empty($the_widget) ) return $the_widget;
+		if( ! empty( $the_widget ) ) return $the_widget;
 
-		if( preg_match('/SiteOrigin_Widget_([A-Za-z]+)_Widget/', $class, $matches) ) {
+		if( preg_match('/SiteOrigin_Widgets?_([A-Za-z]+)_Widget/', $class, $matches) ) {
 			$name = $matches[1];
 			$id = strtolower( implode( '-', array_filter( preg_split( '/(?=[A-Z])/', $name ) ) ) );
+
+			if( $id == 'contact-form' ) {
+				// Handle the special case of the contact form widget, which is incorrectly named
+				$id = 'contact';
+			}
+
 			$this->activate_widget($id, true);
 			global $wp_widget_factory;
 			if( !empty($wp_widget_factory->widgets[$class]) ) return $wp_widget_factory->widgets[$class];
@@ -687,14 +719,58 @@ class SiteOrigin_Widgets_Bundle {
 	 * Add action links.
 	 */
 	function plugin_action_links($links){
-		unset( $links['edit'] );
+		if ( isset( $links['edit'] ) ) {
+			unset( $links['edit'] );
+		}
 		$links['manage'] = '<a href="' . admin_url('plugins.php?page=so-widgets-plugins') . '">'.__('Manage Widgets', 'so-widgets-bundle').'</a>';
-		$links['support'] = '<a href="https://siteorigin.com/thread/" target="_blank">'.__('Support', 'so-widgets-bundle').'</a>';
+		$links['support'] = '<a href="https://siteorigin.com/thread/" target="_blank" rel="noopener noreferrer">'.__('Support', 'so-widgets-bundle').'</a>';
 		return $links;
 	}
 
-	function register_general_scripts(){
-		wp_register_script( 'sow-fittext', plugin_dir_url( __FILE__ ) . 'js/sow.jquery.fittext' . SOW_BUNDLE_JS_SUFFIX . '.js', array( 'jquery' ), '1.2', true );
+	function register_general_scripts() {
+		wp_register_script(
+			'sowb-fittext',
+			plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'js/sow.jquery.fittext' . SOW_BUNDLE_JS_SUFFIX . '.js',
+			array( 'jquery' ),
+			'1.2',
+			true
+		);
+		wp_register_script(
+			'dessandro-imagesLoaded',
+			plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'js/lib/imagesloaded.pkgd' . SOW_BUNDLE_JS_SUFFIX . '.js',
+			array( 'jquery' ),
+			'3.2.0',
+			true
+		);
+		wp_register_script(
+			'dessandro-packery',
+			plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'js/lib/packery.pkgd' . SOW_BUNDLE_JS_SUFFIX . '.js',
+			array( 'jquery' ),
+			'1.4.3',
+			true
+		);
+		wp_register_script(
+			'sow-google-map',
+			plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'js/sow.google-map' . SOW_BUNDLE_JS_SUFFIX . '.js',
+			array( 'jquery' ),
+			SOW_BUNDLE_VERSION
+		);
+		wp_register_script(
+			'sowb-pikaday',
+			plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'js/lib/pikaday' . SOW_BUNDLE_JS_SUFFIX . '.js',
+			array( ),
+			'1.6.1'
+		);
+		wp_register_script(
+			'sowb-pikaday-jquery',
+			plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'js/lib/pikaday.jquery' . SOW_BUNDLE_JS_SUFFIX . '.js',
+			array( 'sowb-pikaday' ),
+			'1.6.1'
+		);
+		wp_register_style(
+			'sowb-pikaday',
+			plugin_dir_url(__FILE__) . 'js/lib/pikaday.css'
+		);
 	}
 
 	/**
@@ -710,10 +786,12 @@ class SiteOrigin_Widgets_Bundle {
 					if ( ! empty( $wp_registered_widgets[$id] ) ) {
 						$widget = $wp_registered_widgets[$id]['callback'][0];
 						if ( !empty($widget) && is_object($widget) && is_subclass_of($widget, 'SiteOrigin_Widget') && is_active_widget( false, false, $widget->id_base ) ) {
+							/* @var $widget SiteOrigin_Widget */
 							$opt_wid = get_option( 'widget_' . $widget->id_base );
 							preg_match( '/-([0-9]+$)/', $id, $num_match );
 							$widget_instance = $opt_wid[ $num_match[1] ];
 							$widget->enqueue_frontend_scripts( $widget_instance);
+							// TODO: Should be calling modify_instance here before generating the CSS.
 							$widget->generate_and_enqueue_instance_styles( $widget_instance );
 						}
 					}
@@ -721,6 +799,67 @@ class SiteOrigin_Widgets_Bundle {
 			}
 		}
 	}
+	
+	/**
+	 * Enqueue scripts for registered widgets, by calling their form and/or widget functions.
+	 *
+	 * @param bool $front_end Whether to enqueue scripts for the front end.
+	 * @param bool $admin Whether to enqueue scripts for admin.
+	 */
+	function enqueue_registered_widgets_scripts( $front_end = true, $admin = true ) {
+		
+		global $wp_widget_factory, $post;
+		// Store a reference to the $post global to allow any secondary queries to run without affecting it.
+		$global_post = $post;
+		
+		foreach ( $wp_widget_factory->widgets as $class => $widget_obj ) {
+			if ( ! empty( $widget_obj ) && is_object( $widget_obj ) && is_subclass_of( $widget_obj, 'SiteOrigin_Widget' ) ) {
+				/* @var $widget_obj SiteOrigin_Widget */
+				ob_start();
+				if ( $admin ) {
+					$widget_obj->enqueue_scripts( 'widget' );
+				}
+				if ( $front_end ) {
+					// Enqueue scripts for previews.
+					$widget_obj->enqueue_frontend_scripts( array() );
+				}
+				ob_clean();
+			}
+		}
+		
+		// Reset the $post global back to what it was before any secondary queries.
+		$post = $global_post;
+	}
+
+	/**
+	 * This removes the 'uploads/siteorigin-widgets' folder from exclusion for CSS aggregation in Autoptimize.
+	 *
+	 * @param $excluded
+	 * @param $content
+	 *
+	 * @return string
+	 */
+	public function include_widgets_css_in_autoptimize( $excluded, $content ) {
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+
+		$excl = array_map( 'trim', explode( ',', $excluded ) );
+		$add = array();
+		$uploads_dir = wp_upload_dir();
+		foreach ( $excl as $index => $path ) {
+			if (strpos( $uploads_dir['basedir'], untrailingslashit( $path ) ) !== false ) {
+				// Iterate over items in uploads and add to excluded, except for the 'siteorigin-widgets' folder.
+				$excl[ $index ] = '';
+				$uploads_items  = list_files( $uploads_dir['basedir'], 1, array( 'siteorigin-widgets' ) );
+				foreach ( $uploads_items as $item ) {
+					$add[] = str_replace( ABSPATH, '', $item );
+				}
+			}
+		}
+		$excluded = implode( ',', array_filter( array_merge( $excl, $add ) ) );
+
+		return $excluded;
+	}
+
 }
 
 // create the initial single

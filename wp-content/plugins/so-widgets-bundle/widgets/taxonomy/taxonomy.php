@@ -5,6 +5,7 @@ Widget Name: Taxonomy
 Description: Displays the selected taxonomy for the current post.
 Author: SiteOrigin
 Author URI: https://siteorigin.com
+Documentation: https://siteorigin.com/widgets-bundle/taxonomy-widget/
 */
 
 class SiteOrigin_Widget_Taxonomy_Widget extends SiteOrigin_Widget {
@@ -47,6 +48,7 @@ class SiteOrigin_Widget_Taxonomy_Widget extends SiteOrigin_Widget {
 				'options' => array(
 					'link'   => __( 'Links', 'so-widgets-bundle' ),
 					'button' => __( 'Buttons', 'so-widgets-bundle' ),
+					'text' => __( 'Text', 'so-widgets-bundle' ),
 				),
 			),
 			'color'          => array(
@@ -57,10 +59,19 @@ class SiteOrigin_Widget_Taxonomy_Widget extends SiteOrigin_Widget {
 				'type'  => 'color',
 				'label' => __( 'Hover color', 'so-widgets-bundle' ),
 			),
+			'new_window' => array(
+				'type' => 'checkbox',
+				'default' => false,
+				'label' => __( 'Open in a new window', 'so-widgets-bundle' ),
+			),
 		);
 	}
 
 	function get_less_variables( $instance ) {
+		if ( empty( $instance ) ) {
+			return array();
+		}
+
 		return array(
 			'color' => $instance['color'],
 			'has_color' => empty($instance['color']) ? 'false' : 'true',
@@ -87,6 +98,7 @@ class SiteOrigin_Widget_Taxonomy_Widget extends SiteOrigin_Widget {
 			'taxonomy_name' => $instance['taxonomy'],
 			'label' => $instance['label'],
 			'display_format' => $instance['display_format'],
+			'new_window' => $instance['new_window'],
 		);
 	}
 }

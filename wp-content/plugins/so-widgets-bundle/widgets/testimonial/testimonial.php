@@ -4,6 +4,7 @@ Widget Name: Testimonials
 Description: Display some testimonials.
 Author: SiteOrigin
 Author URI: https://siteorigin.com
+Documentation: https://siteorigin.com/widgets-bundle/testimonials-widget/
 */
 
 class SiteOrigin_Widgets_Testimonials_Widget extends SiteOrigin_Widget {
@@ -89,7 +90,7 @@ class SiteOrigin_Widgets_Testimonials_Widget extends SiteOrigin_Widget {
 
 					'new_window' => array(
 						'type' => 'checkbox',
-						'label' => __('Open In New Window', 'so-widgets-bundle'),
+						'label' => __('Open in a new window', 'so-widgets-bundle'),
 					),
 				)
 			),
@@ -125,10 +126,18 @@ class SiteOrigin_Widgets_Testimonials_Widget extends SiteOrigin_Widget {
 										'integer' => true,
 										'default' => 2
 									),
+									'image_size' => array(
+										'type' => 'slider',
+										'label' => __( 'Image size', 'so-widgets-bundle' ),
+										'integer' => true,
+										'default' => 50,
+										'max' => 150,
+										'min' => 20,
+									),
 									'width' => array(
 										'type' => 'text',
-										'label' => __('Resolution', 'so-widgets-bundle'),
-										'description' => __('The resolution to treat as a tablet resolution.', 'so-widgets-bundle'),
+										'label' => __( 'Resolution', 'so-widgets-bundle' ),
+										'description' => __( 'The resolution to treat as a tablet resolution.', 'so-widgets-bundle' ),
 										'default' => 800,
 										'sanitize' => 'intval',
 									)
@@ -146,10 +155,18 @@ class SiteOrigin_Widgets_Testimonials_Widget extends SiteOrigin_Widget {
 										'integer' => true,
 										'default' => 1
 									),
+									'image_size' => array(
+										'type' => 'slider',
+										'label' => __( 'Image size', 'so-widgets-bundle' ),
+										'integer' => true,
+										'default' => 50,
+										'max' => 150,
+										'min' => 20,
+									),
 									'width' => array(
 										'type' => 'text',
-										'label' => __('Resolution', 'so-widgets-bundle'),
-										'description' => __('The resolution to treat as a tablet resolution.', 'so-widgets-bundle'),
+										'label' => __( 'Resolution', 'so-widgets-bundle' ),
+										'description' => __( 'The resolution to treat as a mobile resolution.', 'so-widgets-bundle' ),
 										'default' => 480,
 										'sanitize' => 'intval',
 									)
@@ -172,7 +189,7 @@ class SiteOrigin_Widgets_Testimonials_Widget extends SiteOrigin_Widget {
 						'fields' => array(
 							'image_shape' => array(
 								'type' => 'select',
-								'label' => __('Testimonial image shape', 'so-widgets-bundle'),
+								'label' => __('Image shape', 'so-widgets-bundle'),
 								'options' => array(
 									'square' => __('Square', 'so-widgets-bundle'),
 									'round' => __('Round', 'so-widgets-bundle'),
@@ -197,16 +214,16 @@ class SiteOrigin_Widgets_Testimonials_Widget extends SiteOrigin_Widget {
 						'fields' => array(
 							'testimonial_background' => array(
 								'type' => 'color',
-								'label' => __('Widget Background', 'so-widgets-bundle'),
+								'label' => __('Widget background', 'so-widgets-bundle'),
 							),
 							'text_background' => array(
 								'type' => 'color',
-								'label' => __('Text Background', 'so-widgets-bundle'),
+								'label' => __('Text background', 'so-widgets-bundle'),
 								'default' => '#f0f0f0',
 							),
 							'text_color' => array(
 								'type' => 'color',
-								'label' => __('Text Color', 'so-widgets-bundle'),
+								'label' => __('Text color', 'so-widgets-bundle'),
 								'default' => '#444444',
 							),
 						),
@@ -223,7 +240,7 @@ class SiteOrigin_Widgets_Testimonials_Widget extends SiteOrigin_Widget {
 
 					'border_radius' => array(
 						'type' => 'slider',
-						'label' => __('Padding', 'so-widgets-bundle'),
+						'label' => __( 'Text background radius', 'so-widgets-bundle' ),
 						'integer' => true,
 						'default' => 4,
 						'max' => 100,
@@ -286,6 +303,9 @@ class SiteOrigin_Widgets_Testimonials_Widget extends SiteOrigin_Widget {
 	}
 
 	function get_less_variables( $instance ){
+		if ( empty( $instance ) ) {
+			return array();
+		}
 		return array (
 			'image_size' => intval($instance['design']['image']['image_size']) . 'px',
 			'testimonial_size' => round(100/$instance['settings']['per_line'], 4) . '%',
@@ -299,8 +319,10 @@ class SiteOrigin_Widgets_Testimonials_Widget extends SiteOrigin_Widget {
 
 			// All the responsive sizes
 			'tablet_testimonial_size' => round(100/$instance['settings']['responsive']['tablet']['per_line'], 4) . '%',
+			'tablet_image_size' => intval( $instance['settings']['responsive']['tablet']['image_size'] ) . 'px',
 			'tablet_width' => intval($instance['settings']['responsive']['tablet']['width']) . 'px',
 			'mobile_testimonial_size' => round(100/$instance['settings']['responsive']['mobile']['per_line'], 4) . '%',
+			'mobile_image_size' => intval( $instance['settings']['responsive']['mobile']['image_size'] ) . 'px',
 			'mobile_width' => intval($instance['settings']['responsive']['mobile']['width']) . 'px',
 		);
 	}
@@ -322,7 +344,7 @@ class SiteOrigin_Widgets_Testimonials_Widget extends SiteOrigin_Widget {
 			}
 			else {
 				$src = wp_get_attachment_image_src( $image_id, array( $design['image']['image_size'], $design['image']['image_size'] ) );
-				return '<div class="sow-round-image-frame" style="background-image: url(' . esc_url( $src[0] ) . '); width:' . intval($design['image']['image_size']) . 'px; height:' . intval($design['image']['image_size']) . 'px"></div>';
+				return '<div class="sow-round-image-frame" style="background-image: url(' . esc_url( $src[0] ) . ');"></div>';
 			}
 		}
 	}
@@ -338,6 +360,14 @@ class SiteOrigin_Widgets_Testimonials_Widget extends SiteOrigin_Widget {
 		return str_replace( '_', '-', implode( ' ', $classes ) );
 	}
 
+	function get_form_teaser(){
+		if( class_exists( 'SiteOrigin_Premium' ) ) return false;
+		return sprintf(
+			__( 'Get more font customization options with %sSiteOrigin Premium%s', 'so-widgets-bundle' ),
+			'<a href="https://siteorigin.com/downloads/premium/?featured_addon=plugin/testimonial" target="_blank" rel="noopener noreferrer">',
+			'</a>'
+		);
+	}
 }
 
 siteorigin_widget_register( 'sow-testimonials', __FILE__, 'SiteOrigin_Widgets_Testimonials_Widget' );
