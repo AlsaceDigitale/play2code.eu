@@ -1,32 +1,32 @@
 <?php
-$onepress_team_id       = get_theme_mod( 'onepress_team_id', esc_html__('team', 'onepress') );
-$onepress_team_disable  = get_theme_mod( 'onepress_team_disable' ) ==  1 ? true : false;
-$onepress_team_title    = get_theme_mod( 'onepress_team_title', esc_html__('Our Team', 'onepress' ));
-$onepress_team_subtitle = get_theme_mod( 'onepress_team_subtitle', esc_html__('Section subtitle', 'onepress' ));
-$layout = intval( get_theme_mod( 'onepress_team_layout', 3 ) );
+$id       = get_theme_mod( 'onepress_team_id', esc_html__('team', 'onepress') );
+$disable  = get_theme_mod( 'onepress_team_disable' ) ==  1 ? true : false;
+$title    = get_theme_mod( 'onepress_team_title', esc_html__('Our Team', 'onepress' ));
+$subtitle = get_theme_mod( 'onepress_team_subtitle', esc_html__('Section subtitle', 'onepress' ));
+$layout   = intval( get_theme_mod( 'onepress_team_layout', 3 ) );
 if ( $layout <= 0 ){
     $layout = 3;
 }
 $user_ids = onepress_get_section_team_data();
 if ( onepress_is_selective_refresh() ) {
-    $onepress_team_disable = false;
+    $disable = false;
 }
 if ( ! empty( $user_ids ) ) {
     $desc = get_theme_mod( 'onepress_team_desc' );
     ?>
-    <?php if ( ! $onepress_team_disable ) : ?>
+    <?php if ( ! $disable ) : ?>
         <?php if ( ! onepress_is_selective_refresh() ){ ?>
-        <section id="<?php if ($onepress_team_id != '') echo $onepress_team_id; ?>" <?php do_action('onepress_section_atts', 'team'); ?>
+        <section id="<?php if ($id != '') { echo esc_attr( $id ); }; ?>" <?php do_action('onepress_section_atts', 'team'); ?>
                  class="<?php echo esc_attr(apply_filters('onepress_section_class', 'section-team section-padding section-meta onepage-section', 'team')); ?>">
         <?php } ?>
             <?php do_action('onepress_section_before_inner', 'team'); ?>
-            <div class="container">
-                <?php if ( $onepress_team_title || $onepress_team_subtitle || $desc ){ ?>
+            <div class="<?php echo esc_attr( apply_filters( 'onepress_section_container_class', 'container', 'team' ) ); ?>">
+                <?php if ( $title || $subtitle || $desc ){ ?>
                 <div class="section-title-area">
-                    <?php if ($onepress_team_subtitle != '') echo '<h5 class="section-subtitle">' . esc_html($onepress_team_subtitle) . '</h5>'; ?>
-                    <?php if ($onepress_team_title != '') echo '<h2 class="section-title">' . esc_html($onepress_team_title) . '</h2>'; ?>
+                    <?php if ($subtitle != '') echo '<h5 class="section-subtitle">' . esc_html($subtitle) . '</h5>'; ?>
+                    <?php if ($title != '') echo '<h2 class="section-title">' . esc_html($title) . '</h2>'; ?>
                     <?php if ( $desc ) {
-                        echo '<div class="section-desc">' . apply_filters( 'the_content', wp_kses_post( $desc ) ) . '</div>';
+                        echo '<div class="section-desc">' . apply_filters( 'onepress_the_content', wp_kses_post( $desc ) ) . '</div>';
                     } ?>
                 </div>
                 <?php } ?>
@@ -46,6 +46,8 @@ if ( ! empty( $user_ids ) ) {
                              ) );
 
                             $image_attributes = wp_get_attachment_image_src( $user_id['id'], 'onepress-small' );
+                            $image_alt = get_post_meta( $user_id['id'], '_wp_attachment_image_alt', true);
+
                             if ( $image_attributes ) {
                                 $image = $image_attributes[0];
                                 $data = get_post( $user_id['id'] );
@@ -56,7 +58,7 @@ if ( ! empty( $user_ids ) ) {
                                         <?php if ( $link ) { ?>
                                             <a href="<?php echo esc_url( $link ); ?>">
                                         <?php } ?>
-                                        <img src="<?php echo esc_url( $image ); ?>" alt="">
+                                        <img src="<?php echo esc_url( $image ); ?>" alt="<?php echo $image_alt; ?>">
                                         <?php if ( $link ) { ?>
                                             </a>
                                         <?php } ?>

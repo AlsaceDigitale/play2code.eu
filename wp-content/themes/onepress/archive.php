@@ -9,7 +9,7 @@
 
 get_header();
 
-$layout = get_theme_mod( 'onepress_layout', 'right-sidebar' );
+$layout = onepress_get_layout();
 ?>
 
 	<div id="content" class="site-content">
@@ -21,7 +21,7 @@ $layout = get_theme_mod( 'onepress_layout', 'right-sidebar' );
 			</div>
 		</div>
 
-		<?php echo onepress_breadcrumb(); ?>
+		<?php onepress_breadcrumb(); ?>
 
 		<div id="content-inside" class="container <?php echo esc_attr( $layout ); ?>">
 			<div id="primary" class="content-area">

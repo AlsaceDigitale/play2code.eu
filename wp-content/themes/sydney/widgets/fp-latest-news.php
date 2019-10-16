@@ -35,34 +35,14 @@ class Sydney_Latest_News extends WP_Widget {
 		$instance['category'] 		= strip_tags($new_instance['category']);
 		$instance['see_all_text'] 	= strip_tags($new_instance['see_all_text']);						
 
-		$alloptions = wp_cache_get( 'alloptions', 'options' );
-		if ( isset($alloptions['sydney_latest_news']) )
-			delete_option('sydney_latest_news');		  
-		  
 		return $instance;
 	}
 		
 	// display widget
 	function widget($args, $instance) {
-		$cache = array();
-		if ( ! $this->is_preview() ) {
-			$cache = wp_cache_get( 'sydney_latest_news', 'widget' );
-		}
-
-		if ( ! is_array( $cache ) ) {
-			$cache = array();
-		}
-
 		if ( ! isset( $args['widget_id'] ) ) {
 			$args['widget_id'] = $this->id;
 		}
-
-		if ( isset( $cache[ $args['widget_id'] ] ) ) {
-			echo $cache[ $args['widget_id'] ];
-			return;
-		}
-
-		ob_start();
 		extract($args);
 
 		$title = ( ! empty( $instance['title'] ) ) ? $instance['title'] : '';
@@ -103,7 +83,7 @@ class Sydney_Latest_News extends WP_Widget {
 		<?php $cat = get_term_by('slug', $category, 'category') ?>
 		<?php if ($category) : //Link to the category page instead of blog page if a category is selected ?>
 			<a href="<?php echo esc_url(get_category_link(get_cat_ID($cat -> name))); ?>" class="roll-button more-button"><?php echo $see_all_text; ?></a>
-		<?php else : ?>
+		<?php elseif ( get_option( 'page_for_posts' ) ) : ?>
 			<a href="<?php echo get_permalink( get_option( 'page_for_posts' ) ); ?>" class="roll-button more-button"><?php echo $see_all_text; ?></a>
 		<?php endif; ?>		
 	<?php
@@ -111,13 +91,6 @@ class Sydney_Latest_News extends WP_Widget {
 		wp_reset_postdata();
 
 		endif;
-
-		if ( ! $this->is_preview() ) {
-			$cache[ $args['widget_id'] ] = ob_get_flush();
-			wp_cache_set( 'sydney_latest_news', $cache, 'widget' );
-		} else {
-			ob_end_flush();
-		}
 	}
 	
 }

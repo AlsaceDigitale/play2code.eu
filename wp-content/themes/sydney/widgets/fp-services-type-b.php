@@ -66,34 +66,15 @@ class Sydney_Services_Type_B extends WP_Widget {
 		$instance['category'] 		= strip_tags($new_instance['category']);
 		$instance['cols'] 			= strip_tags($new_instance['cols']);
 		$instance['content_excerpt'] = sanitize_text_field($new_instance['content_excerpt']);		
-		    			
-		$alloptions = wp_cache_get( 'alloptions', 'options' );
-		if ( isset($alloptions['sydney_services']) )
-			delete_option('sydney_services');		  
-		  
+  
 		return $instance;
 	}
 		
 	function widget($args, $instance) {
-		$cache = array();
-		if ( ! $this->is_preview() ) {
-			$cache = wp_cache_get( 'sydney_services', 'widget' );
-		}
-
-		if ( ! is_array( $cache ) ) {
-			$cache = array();
-		}
-
 		if ( ! isset( $args['widget_id'] ) ) {
 			$args['widget_id'] = $this->id;
 		}
 
-		if ( isset( $cache[ $args['widget_id'] ] ) ) {
-			echo $cache[ $args['widget_id'] ];
-			return;
-		}
-
-		ob_start();
 		extract($args);
 
 		$title 			= ( ! empty( $instance['title'] ) ) ? $instance['title'] : '';
@@ -134,10 +115,14 @@ class Sydney_Services_Type_B extends WP_Widget {
 						<?php $icon = get_post_meta( get_the_ID(), 'wpcf-service-icon', true ); ?>
 						<?php $link = get_post_meta( get_the_ID(), 'wpcf-service-link', true ); ?>
 						<div class="service clearfix <?php echo $cols_no; ?>">
-							<div class="list-item">
+							<div class="list-item clearfix">
 								<?php if ( has_post_thumbnail() ) : ?>
 									<div class="service-thumb">
-										<?php the_post_thumbnail('sydney-service-thumb'); ?>
+										<?php if ($link) : ?>
+											<?php echo '<a href="' . esc_url($link) . '">' . get_the_post_thumbnail(get_the_ID(), 'sydney-service-thumb') . '</a>'; ?>
+										<?php else : ?>
+											<?php the_post_thumbnail('sydney-service-thumb'); ?>
+										<?php endif; ?>
 									</div>
 								<?php elseif ($icon) : ?>			
 									<div class="icon">
@@ -180,13 +165,6 @@ class Sydney_Services_Type_B extends WP_Widget {
 		wp_reset_postdata();
 		endif;
 		echo $args['after_widget'];
-
-		if ( ! $this->is_preview() ) {
-			$cache[ $args['widget_id'] ] = ob_get_flush();
-			wp_cache_set( 'sydney_services', $cache, 'widget' );
-		} else {
-			ob_end_flush();
-		}
 	}
 	
 }
