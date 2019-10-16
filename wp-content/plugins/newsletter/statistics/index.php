@@ -1,10 +1,13 @@
 <?php
 /* @var $wpdb wpdb */
-if (!defined('ABSPATH')) exit;
+if (!defined('ABSPATH'))
+    exit;
 
 require_once NEWSLETTER_INCLUDES_DIR . '/controls.php';
 $module = NewsletterStatistics::instance();
 $controls = new NewsletterControls();
+
+wp_enqueue_script('tnp-chart');
 
 if ($controls->is_action('country')) {
     $module->country();
@@ -50,24 +53,25 @@ $open_count_total = 0;
 $click_count_total = 0;
 foreach ($emails as $email) {
     $entry = array();
-    $total_sent += $email->sent;
-    if (empty($email->sent)) {
-//        $entry[0] = date('Y-m-d', $email->send_on);
-//        $entry[1] = 0;
-//	$entry[2] = $email->subject;// . ' (' . percent($open_count, $email->sent) . ')';
-//        $entry[3] = 0;
+
+    // Skip newsletters which has no sent records
+    $total = $module->get_total_count($email);
+    if (empty($total)) {
         continue;
     }
+
+    $total_sent += $total;
+
     //$entry[0] = $email->subject . ' [' . date('Y-m-d', $email->send_on) . ', ' . $email->type . ']';
     $entry[0] = date('Y-m-d', $email->send_on);
-    $open_count = $wpdb->get_var("select count(distinct user_id) from " . NEWSLETTER_STATS_TABLE . " where email_id=" . $email->id);
+    $open_count = $module->get_open_count($email);
     $open_count_total += $open_count;
-    $entry[1] = $open_count / $email->sent * 100;
+    $entry[1] = $open_count / $total * 100;
     $entry[1] = round($entry[1], 2);
     $entry[2] = $email->subject; // . ' (' . percent($open_count, $email->sent) . ')';
-    $click_count = $wpdb->get_var("select count(distinct user_id) from " . NEWSLETTER_STATS_TABLE . " where url<>'' and email_id=" . $email->id);
+    $click_count = $module->get_click_count($email);
     $click_count_total += $click_count;
-    $entry[3] = $click_count / $email->sent * 100;
+    $entry[3] = $click_count / $total * 100;
     $entry[3] = round($entry[3], 2);
 
     $overview_labels[] = strftime('%a, %e %b', $email->send_on);
@@ -79,52 +83,35 @@ foreach ($emails as $email) {
 $overview_labels = array_reverse($overview_labels);
 $overview_open_rate = array_reverse($overview_open_rate);
 $overview_click_rate = array_reverse($overview_click_rate);
-
-function percent($value, $total) {
-    if ($total == 0)
-        return '-';
-    return sprintf("%.2f", $value / $total * 100) . '%';
-}
-
-function percentValue($value, $total) {
-    if ($total == 0)
-        return 0;
-    return round($value / $total * 100);
-}
 ?>
-
-<script type="text/javascript" src="<?php echo plugins_url('newsletter') ?>/js/Chart2.min.js"></script>
-<script type="text/javascript" src="<?php echo plugins_url('newsletter') ?>/js/jquery.vmap.min.js"></script>
-<script type="text/javascript" src="<?php echo plugins_url('newsletter') ?>/js/jquery.vmap.world.js"></script>
-<link href="<?php echo plugins_url('newsletter') ?>/css/jqvmap.css" media="screen" rel="stylesheet" type="text/css"/>
 
 <div class="wrap" id="tnp-wrap">
     <?php include NEWSLETTER_DIR . '/tnp-header.php' ?>
     <div id="tnp-heading">
-        
-        
+
+
         <h2><?php _e('Global Newsletter Statistics', 'newsletter') ?></h2>
-            
+
     </div>
 
-    <div id="tnp-body">
+    <div id="tnp-body" class="tnp-statistics">
         <form method="post" action="">
 
             <?php $controls->init(); ?>
 
             <?php if (empty($emails)) { ?>
-                <img src="http://cdn.thenewsletterplugin.com/tnp-reports-dummy-image.png" style="max-width: 100%">
-                
+                <img src="https://cdn.thenewsletterplugin.com/tnp-reports-dummy-image.png" style="max-width: 100%">
+
             <?php } else { ?>
-                
+
                 <div class="row">
-                    
-                        <div class="tnp-statistics-info-box">
-                            <p class="tnp-legend">Select Newsletter category:</p>
-                            <?php $controls->select('type', $type_options, 'All') ?>
-                            <?php $controls->button('update', __('Update Charts', 'newsletter')) ?>
-                        </div>
-                    
+
+                    <div class="tnp-statistics-info-box">
+                        <p class="tnp-legend">Select Newsletter category:</p>
+                        <?php $controls->select('type', $type_options, 'All') ?>
+                        <?php $controls->button('update', __('Update Charts', 'newsletter')) ?>
+                    </div>
+
                 </div>
 
                 <br>
@@ -134,9 +121,9 @@ function percentValue($value, $total) {
                         <div class="tnp-widget">
                             <h3>Overview (Last 20 Newsletters)</h3>
                             <div class="inside">
-                                
+
                                 <p class="tnp-events-legend">Subscribers interactions distribution over time,<br>starting from the sending day.</p>
-                                
+
                                 <div id="tnp-events-chart">
                                     <canvas id="tnp-events-chart-canvas"></canvas>
                                 </div>
@@ -168,7 +155,7 @@ function percentValue($value, $total) {
                                             }
                                         ]
                                     };
-                                    
+
                                     var titles = <?php echo json_encode(array_reverse($overview_titles)) ?>;
 
                                     jQuery(document).ready(function ($) {
@@ -176,7 +163,7 @@ function percentValue($value, $total) {
                                         eventsLineChart = new Chart(ctxe, {type: 'line', data: events_data,
                                             options: {
                                                 scales: {
-                                                    xAxes: [{type:"category","id":"x-axis-1", gridLines: {display: false}, ticks: {fontFamily: "Source Sans Pro"}}],
+                                                    xAxes: [{type: "category", "id": "x-axis-1", gridLines: {display: false}, ticks: {fontFamily: "Source Sans Pro"}}],
                                                     yAxes: [
                                                         {type: "linear", "id": "y-axis-1", gridLines: {display: false}, ticks: {fontColor: "#27AE60", fontFamily: "Source Sans Pro"}},
                                                         {type: "linear", "id": "y-axis-2", position: "right", gridLines: {display: false}, ticks: {fontColor: "#C0392B", fontFamily: "Source Sans Pro"}}
@@ -184,11 +171,11 @@ function percentValue($value, $total) {
                                                 },
                                                 tooltips: {
                                                     callbacks: {
-                                                        afterTitle: function(data) {
+                                                        afterTitle: function (data) {
                                                             return titles[data[0].index];
                                                         },
-                                                        label: function(tooltipItem, data) {
-                                                            return data.datasets[0].label + ": " + data.datasets[0].data[tooltipItem.index] + "% " + 
+                                                        label: function (tooltipItem, data) {
+                                                            return data.datasets[0].label + ": " + data.datasets[0].data[tooltipItem.index] + "% " +
                                                                     data.datasets[1].label + ": " + data.datasets[1].data[tooltipItem.index] + "%";
                                                         }
                                                     }
@@ -197,40 +184,33 @@ function percentValue($value, $total) {
                                         });
                                     });
                                 </script>
-                                
+
                                 <div class="row">
-                                    <div class="col-md-3">
+                                    <div class="col-md-4">
                                         <div class="tnp-data">
                                             <div class="tnp-data-title"><?php _e('Total Sent Messages', 'newsletter') ?></div>
                                             <div class="tnp-data-value"><?php echo $total_sent; ?></div>
                                         </div>
                                     </div>
 
-                                    <div class="col-md-3">
-                                        <div class="tnp-data">
-                                            <div class="tnp-data-title"><?php _e('Total Interactions', 'newsletter') ?></div>
-                                            <div class="tnp-data-value"><?php echo $open_count_total; ?> (<?php echo percent($open_count_total, $total_sent); ?>)</div>
-                                        </div>
-                                    </div>
-
-                                    <div class="col-md-3">
+                                    <div class="col-md-4">
                                         <div class="tnp-data">
                                             <div class="tnp-data-title"><?php _e('Opened Newsletters', 'newsletter') ?></div>
-                                            <div class="tnp-data-value"><?php echo $open_count_total - $click_count_total; ?> (<?php echo percent($open_count_total - $click_count_total, $total_sent); ?>)</div>
+                                            <div class="tnp-data-value"><?php echo $open_count_total; ?> (<?php echo $module->percent($open_count_total, $total_sent); ?>)</div>
                                         </div>
                                     </div>
 
-                                    <div class="col-md-3">
+                                    <div class="col-md-4">
                                         <div class="tnp-data">
                                             <div class="tnp-data-title"><?php _e('Clicked Newsletters', 'newsletter') ?></div>
-                                            <div class="tnp-data-value"><?php echo $click_count_total; ?> (<?php echo percent($click_count_total, $total_sent); ?>)</div>
+                                            <div class="tnp-data-value"><?php echo $click_count_total; ?> (<?php echo $module->percent($click_count_total, $total_sent); ?>)</div>
                                         </div>
                                     </div>
                                 </div>  
                             </div>
                         </div>
                     </div>
-           
+
 
                     <!-- WORLD MAP -->
                     <div class="col-md-6">
@@ -239,7 +219,7 @@ function percentValue($value, $total) {
                             <div class="inside">
                                 <?php
                                 if (!has_action('newsletter_statistics_index_map')) {
-                                    ?><a href="http://www.thenewsletterplugin.com/premium?utm_source=plugin&utm_medium=link&utm_content=worldmap&utm_campaign=newsletter-reports" target="_blank">
+                                    ?><a href="https://www.thenewsletterplugin.com/premium?utm_source=plugin&utm_medium=link&utm_content=worldmap&utm_campaign=newsletter-reports" target="_blank">
                                         <img src="<?php echo plugins_url('newsletter') ?>/statistics/images/map.gif" style="width: 100%">
                                     </a><?php
                                 } else {
@@ -250,9 +230,9 @@ function percentValue($value, $total) {
                             </div>
                         </div>
                     </div>
-                    
+
                 </div>
-                
+
                 <div class="row">
 
 
@@ -266,7 +246,7 @@ function percentValue($value, $total) {
                                 ?>
 
                                 <table class="widefat">
-                                       <thead>
+                                    <thead>
                                         <tr>
                                             <th>Id</th>
                                             <th><?php _e('Subject', 'newsletter') ?></th>
@@ -284,7 +264,7 @@ function percentValue($value, $total) {
                                                 <td><?php echo $module->get_email_type_label($email); ?></td>
                                                 <td><?php echo $module->get_email_status_label($email); ?></td>
                                                 <td>
-                                                    <a href="<?php echo NewsletterStatistics::instance()->get_statistics_url($email->id); ?>" class="button">Statistics</a>
+                                                    <a href="<?php echo NewsletterStatistics::instance()->get_statistics_url($email->id); ?>" class="button-primary">Statistics</a>
                                                 </td>
                                             </tr>
                                         <?php } ?>
@@ -295,23 +275,20 @@ function percentValue($value, $total) {
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="row">
                     <div class="col-md-6">
                         <div class="tnp-statistics-info-box">
                             <p class="tnp-legend">Check Statistics global<br>configurations.</p>
-                            <a class="button" href="admin.php?page=newsletter_statistics_settings"><?php _e('Settings') ?></a>
+                            <a class="button-primary" href="admin.php?page=newsletter_statistics_settings"><?php _e('Settings') ?></a>
                         </div>
                     </div>
                     <div class="col-md-6">
-                        
-                    </div>
-                   
-                    
 
-                    
+                    </div>
+
                 </div>
-                
+
 
 
             <?php } ?>
@@ -319,7 +296,7 @@ function percentValue($value, $total) {
 
         </form>
 
-        
+
     </div>
     <?php include NEWSLETTER_DIR . '/tnp-footer.php' ?>
 </div>

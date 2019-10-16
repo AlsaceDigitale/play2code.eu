@@ -17,9 +17,9 @@ $email = $module->get_email($email_id);
 
     <div id="tnp-body" style="min-width: 500px">
 
-        <p><a href="admin.php?page=newsletter_statistics_view&id=<?php echo $email->id ?>" class="button">Back to the dashboard</a></p>
+        <p><a href="admin.php?page=newsletter_statistics_view&id=<?php echo $email->id ?>" class="button-primary">Back to the dashboard</a></p>
 
-        <a href="http://www.thenewsletterplugin.com/premium?utm_source=plugin&utm_medium=link&utm_content=audience&utm_campaign=newsletter-reports" target="_blank">
+        <a href="https://www.thenewsletterplugin.com/premium?utm_source=plugin&utm_medium=link&utm_content=audience&utm_campaign=newsletter-reports" target="_blank">
             <img src="<?php echo plugins_url('newsletter') ?>/statistics/images/users.png">
         </a>
 

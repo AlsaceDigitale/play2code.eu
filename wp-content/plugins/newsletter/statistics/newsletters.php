@@ -22,18 +22,6 @@ foreach ($types as $type) {
         $type_options[$type->type] = $type->type;
     }
 }
-
-function percent($value, $total) {
-    if ($total == 0)
-        return '-';
-    return sprintf("%.2f", $value / $total * 100) . '%';
-}
-
-function percentValue($value, $total) {
-    if ($total == 0)
-        return 0;
-    return round($value / $total * 100);
-}
 ?>
 
 <div class="wrap" id="tnp-wrap">
@@ -77,7 +65,7 @@ function percentValue($value, $total) {
                             <td><?php if ($email->status == 'sent' || $email->status == 'sending') echo $module->format_date($email->send_on); ?></td>
                             <td><?php echo $email->track == 1 ? 'Yes' : 'No'; ?></td>
                             <td>
-                                <a class="button" href="<?php echo NewsletterStatistics::instance()->get_statistics_url($email->id); ?>">statistics</a>
+                                <a class="button-primary" href="<?php echo NewsletterStatistics::instance()->get_statistics_url($email->id); ?>">statistics</a>
                             </td>
                         </tr>
                     <?php } ?>

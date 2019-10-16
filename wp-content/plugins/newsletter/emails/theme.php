@@ -1,5 +1,6 @@
 <?php
-if (!defined('ABSPATH')) exit;
+if (!defined('ABSPATH'))
+    exit;
 
 require_once NEWSLETTER_INCLUDES_DIR . '/controls.php';
 $controls = new NewsletterControls();
@@ -47,14 +48,14 @@ function newsletter_emails_get_theme_options($theme) {
 $themes = $module->themes->get_all_with_data();
 ?>
 
-<div class="wrap" id="tnp-wrap">
+<div class="wrap tnp-emails tnp-emails-theme" id="tnp-wrap">
 
     <?php include NEWSLETTER_DIR . '/tnp-header.php'; ?>
 
     <div id="tnp-heading">
 
         <h2><?php _e('Select a theme', 'newsletter') ?>
-            <a class="tnp-btn-h1" href="http://www.thenewsletterplugin.com/plugins/newsletter/newsletter-themes" target="_blank">Custom themes</a>
+            <a class="tnp-btn-h1" href="https://www.thenewsletterplugin.com/plugins/newsletter/newsletter-themes" target="_blank">Custom themes</a>
         </h2>
 
     </div>
@@ -63,14 +64,29 @@ $themes = $module->themes->get_all_with_data();
         <form method="post" id="newsletter-form" action="<?php echo $module->get_admin_page_url('new'); ?>">
             <?php $controls->init(); ?>
             <?php $controls->hidden('theme'); ?>
-            
-            <div class="tnp-theme-preview">
-                    <p><?php echo _e('Responsive Drag & Drop Composer', 'newsletter') ?></p>
-                    <a href="<?php echo $module->get_admin_page_url('composer'); ?>" style="margin-right: 20px; margin-bottom: 20px">
-                        <img src="<?php echo plugins_url('newsletter') . '/emails/themes/composer.gif' ?>" width="420" height="200">
-                    </a>
+
+                <div class="tnp-themes-new">
+
+                    <div class="tnp-theme-preview">
+                        <p><?php echo _e('Responsive Drag & Drop Composer', 'newsletter') ?></p>
+                        <a href="<?php echo $module->get_admin_page_url('composer'); ?>" style="margin-right: 20px; margin-bottom: 20px">
+                            <img src="<?php echo plugins_url('newsletter') . '/emails/images/composer.gif' ?>" width="420" height="200">
+                        </a>
+                    </div>
+
+                    <div class="tnp-theme-preview">
+                         <p>&lt;&gt; Raw HTML</p>
+                            <a href="#" onclick="var f = document.getElementById('newsletter-form');
+                                    f.act.value = 'theme';
+                                    f.elements['options[theme]'].value = 'rawhtml';
+                                    f.submit();
+                                    return false;" style="margin-right: 20px; margin-bottom: 20px">
+                                <img src="<?php echo plugins_url('newsletter') . '/emails/images/html.png' ?>" width="200" height="200">
+                            </a>
+                    </div>
+
                 </div>
-            
+
             <?php foreach ($themes as $key => $data) { ?>
                 <div class="tnp-theme-preview">
                     <p><?php echo esc_html($data['name']) ?></p>

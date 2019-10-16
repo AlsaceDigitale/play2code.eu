@@ -7,10 +7,10 @@ table, td{mso-table-lspace:0pt; mso-table-rspace:0pt;} /* Remove spacing between
 img{-ms-interpolation-mode:bicubic;} /* Allow smoother rendering of resized image in Internet Explorer */
 
 /* RESET STYLES */
-body{margin:0; padding:0;}
-img{border:0; height:auto; line-height:100%; outline:none; text-decoration:none;}
+body{margin:0; padding:0; height:100% !important; margin:0; padding:0; width:100% !important;}
+img{border:0; height:auto; line-height:100%; outline:none; text-decoration:none; max-width: 100%!important}
 table{border-collapse:collapse !important;}
-body{height:100% !important; margin:0; padding:0; width:100% !important;}
+
 
 /* MOBILE STYLES */
 @media screen and (max-width: 525px) {
@@ -40,7 +40,7 @@ body{height:100% !important; margin:0; padding:0; width:100% !important;}
 
     img[class="img-max"]{
         max-width: 100% !important;
-        width: 100% !important;
+        /*width: 100% !important;*/
         height:auto !important;
     }
 

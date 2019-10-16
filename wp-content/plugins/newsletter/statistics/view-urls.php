@@ -18,9 +18,9 @@ $email = $module->get_email($email_id);
 
     <div id="tnp-body" style="min-width: 500px">
 
-        <p><a href="admin.php?page=newsletter_statistics_view&id=<?php echo $email->id ?>" class="button">Back to the dashboard</a></p>
+        <p><a href="admin.php?page=newsletter_statistics_view&id=<?php echo $email->id ?>" class="button-primary">Back to the dashboard</a></p>
 
-        <p>Clicked links detail is available with <a href="http://www.thenewsletterplugin.com/plugins/newsletter/reports-module" target="_blank">Report Extension</a>.</p>
+        <p>Clicked link details are available with <a href="https://www.thenewsletterplugin.com/plugins/newsletter/reports-module" target="_blank">Report Extension</a>.</p>
 
     </div>
 

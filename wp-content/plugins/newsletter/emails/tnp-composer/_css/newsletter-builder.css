@@ -1,6 +1,7 @@
 .tnp-composer-heading {
-    display: inline-block;
-    margin-bottom: -5px !important;
+    background-color: #0073aa;
+    border-radius: 0px !important;
+    border-top: 5px solid #ffffff;
 }
 
 .tnp-composer-heading h2 {
@@ -25,51 +26,53 @@
     vertical-align: middle;
 }
 
-
-
-
-
 #newsletter-builder {
     position: relative;
     overflow: hidden;
     width: 100%;
     background-color: #FFFFFF;
 }
-#newsletter-builder-sidebar {
-    float: left;
-    /*position: absolute;*/
-    left: 0px;
-    top: 0px;
+
+.tnp-builder-column {
     overflow: auto;
-    height: 100%;
+    height: 85vh;
+    float: left;
+}
+
+#newsletter-builder-sidebar {
     z-index: 1;
-    height: 80vh;
-    width: 210px;
+    width: 33.33%;
+    background-color: #ECF0F1;
+    position: relative;
 }
 
 #newsletter-builder-sidebar h4 {
-    margin: 5px;
-    text-align: center;
-    color: #fff;
-    margin-bottom: 20px;
-    font-family: "Montserrat";
+    /* margin: 5px; */
+    /* text-align: center; */
+    color: #868686;
+    /* margin-bottom: 20px; */
+    font-family: Montserrat, sans-serif;
+    font-weight: 300;
+    border-bottom: 1px solid #fff;
+    padding-bottom: 10px;
 }
 
-#newsletter-builder-sidebar h4 span {
-	background-color: #27AE60;
-	padding: 2px 5px;
-	border-radius: 3px;
-}
+/*#newsletter-builder-sidebar h4 span {
+    background-color: #27AE60;
+    padding: 2px 5px;
+    border-radius: 3px;
+}*/
 
 
 #newsletter-builder-sidebar .newsletter-sidebar-add-buttons img {
-    width: 165px;
+    width: 150px;
+    height: auto;
 }
 
 .newsletter-sidebar-add-buttons {
-	border-radius: 4px;
-	padding: 5px;
-	margin: 5px;
+    border-radius: 4px;
+    padding: 5px;
+    margin: 5px;
 }
 
 .tnp-body-lite {
@@ -77,8 +80,9 @@
 }
 
 .newsletter-sidebar-buttons-content-tab {
-    margin: 5px;
+    margin: 1px;
     position: relative;
+    display: inline-block;
 }
 .newsletter-sidebar-buttons-content-tab:hover {
     cursor: move;
@@ -114,33 +118,53 @@
     /*    cursor: pointer;*/
 }
 
-#newsletter-builder-area{
-    overflow: auto;
-    background-color: #EDF1F4;
-    height: 80vh;
+#newsletter-builder-area {
+    background-color: #fff;
+    width: 66.66%;
+    box-sizing: border-box;
+    padding-left: 50px;
+    padding-right: 50px;
+    padding-top: 10px;
 }
-#newsletter-builder-area-center {
-    margin-right: auto;
-    margin-left: auto;
-    width: 900px;
-    /*height: 80vh;
-    overflow: auto;
-    overflow-x: hidden;*/
-}
-#newsletter-builder-area-center-frame {
-    /*float: left;*/
-    width: 800px;
-    margin-top: 50px;
-    margin-bottom: 200px;
-    margin-left: 50px;
-}
+
+
 
 #newsletter-builder-area-center-frame-content {
     /*float: left;*/
-    width: 800px;
-    background-color: rgba(153,153,153,1);
+    /*width: 730px;*/
+    /*background-color: rgba(153,153,153,1);*/
     min-height: 50px;
+    padding-bottom: 75px;
+    background-color: #ECF0F1;
+    padding-top: 30px;
+    /*border: 1px dashed #eee;*/
 }
+
+#newsletter-mobile-preview-area {
+    margin-left: 30px;
+    box-sizing: border-box;
+    margin-top: 30px;
+    text-align: center;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 10px;
+}
+#newsletter-mobile-preview-area input {
+    width: 100px;
+}
+
+iframe#tnpc-mobile-preview {
+    height: 500px;
+    box-sizing: border-box;
+    width: 320px;
+    border-radius: 30px;
+    margin-top: 20px;
+    margin-left: 20px;
+    background-color: #F6F8FD;
+}
+
 .tnpc-row {
     -webkit-transition: box-shadow 0.5s;
     -moz-transition: box-shadow 0.5s;
@@ -150,15 +174,20 @@
 }
 .tnpc-row:hover {
     cursor: move;
+    /*border: 2px dashed #999;*/
     -webkit-box-shadow:  0px 0px 20px 0px rgba(0,0,0,0.2);
     -moz-box-shadow:  0px 0px 20px 0px rgba(0,0,0,0.2);
     box-shadow:  0px 0px 20px 0px rgba(0,0,0,0.2);
 }
-.tnpc-row-delete, .tnpc-row-edit-block {
-    height: 40px;
-    width: 40px;
+.tnpc-row.ui-sortable-helper {
+    max-width: 700px!important;
+}
+.tnpc-row-delete, .tnpc-row-edit-block, .tnpc-row-clone {
+    height: 30px;
+    width: 30px;
+    top: 0px;
     background-color: rgba(255,255,255,0.5);
-    right: -40px;
+    z-index: 5;
     position: absolute;
     color: rgba(102,102,102,1);
     -webkit-transition: all 0.5s;
@@ -167,30 +196,41 @@
     transition: all 0.5s;
     opacity: 0;	
     text-align: center;
-    font-size: 20px;
+    font-size: 18px;
 }
-.tnpc-row-delete i, .tnpc-row-edit-block i {
-    line-height: 40px;	
+.tnpc-row-delete i, .tnpc-row-edit-block i, .tnpc-row-clone i {
+    line-height: 30px;	
 }
 .tnpc-row-delete:hover {
-    background-color: rgba(255,0,0,1);
+    background-color: #E74C3C;
     cursor: pointer;
     color: rgba(255,255,255,1);
 }
-.tnpc-row:hover .tnpc-row-delete, .tnpc-row:hover .tnpc-row-edit-block {
+.tnpc-row:hover .tnpc-row-delete, .tnpc-row:hover .tnpc-row-edit-block, .tnpc-row:hover .tnpc-row-clone {
     opacity: 1;
 }
 .tnpc-row-delete {
-    top: 40px;
+    right: 0px;
+    z-index: 5;
 }
 .tnpc-row-edit-block {
-    top: 0px;
+    right: 60px;
 }
 .tnpc-row-edit-block:hover {
-    background-color: rgba(255,255,0,1);
+    background-color: #e0e0e0;
+    cursor: pointer;
+    color: rgba(0, 0, 0, 1);
+}
+
+.tnpc-row-clone {
+    right: 30px;
+}
+.tnpc-row-clone:hover {
+    background-color: #e0e0e0;;
     cursor: pointer;
     color: rgba(0,0,0,1);
-}	
+}
+
 .tnpc-row-edit {
     position: relative;
 }		
@@ -240,29 +280,13 @@
 .tnpc-edit {
     height: 100vh;
     width: 100vw;
-    /*position: fixed;*/
-    z-index: 2;
+    z-index: 10;
     display: none;
-    background-image: url(../_assets/background.png);
-    background-repeat: repeat;
     position: absolute;
-    top: 0;
-    left: -20px;
+    top: 0px;
+    left: 0px;
 }
-.tnpc-edit-box {
-    width: 480px;
-    background-color: rgba(255,255,255,1);
-    margin-right: auto;
-    margin-left: auto;
-    margin-top: 10px;
-    -webkit-box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.5);
-    -moz-box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.5);
-    box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.5);
-    padding: 25px;
-    display: none;
-    background-color: #EDF1F4;
-    border-radius: 10px;
-}
+
 .tnpc-edit-box-title {
     /*float: left;*/
     width: 100%;
@@ -374,11 +398,14 @@
     border-radius: 50%;
     color: rgba(0,0,0,1);
 }
+
+/* Save and cancel buttons container on block options popup */
 .tnpc-edit-box-buttons{
-    /*float: left;*/
-    width: 100%;
-    margin-top: 25px;
+    margin-top: 10px;
+    text-align: right;
+    margin-right: 10px;
 }
+
 .tnpc-edit-box-buttons-save{
     height: 35px;
     text-align: right;
@@ -407,8 +434,8 @@
     height: 35px;
     text-align: right;
     line-height: 35px;
-    color: #C0392B;
-    font-weight: 600;
+    color: #666;
+    font-weight: normal;
     font-size: 15px;
     -webkit-border-radius: 3px;
     -moz-border-radius: 3px;
@@ -423,7 +450,7 @@
     padding-left: 25px;
     width: 33%;*/
     display: inline-block;
-    margin-left: 10px;
+    margin-right: 25px;
 }
 .tnpc-edit-box-buttons-cancel:hover {
     color: #E74C3C;
@@ -441,11 +468,6 @@
 
 /* Tnp Composer Preview */
 
-.tnpc-subject input {
-    padding: 12px 15px;
-    margin-left: 20px;
-    width: 70%;
-}
 
 .tnpc-subject a {
     font-family: Source Sans Pro;
@@ -465,9 +487,16 @@
     margin-top: 10px;
 }
 
+.tnpc-preview .fake-browser-ui iframe {
+    width: 700px;
+}
+
+.tnpc-preview .fake-mobile-browser-ui iframe {
+    width: 320px;
+}
 
 .fake-browser-ui {
-    padding: 40px 0 0;
+    padding: 30px 0 0;
     border-radius: 3px;
     border-bottom: 10px solid #ccc;
     background: #ddd;
@@ -476,7 +505,7 @@
     line-height: 0;
     vertical-align: top;
     margin-left: 20px;
-    }
+}
 
 .fake-mobile-browser-ui {
     padding: 30px 10px 37px;
@@ -542,4 +571,230 @@
     height: 600px;
     border-top: 20px solid #323232;
     border-radius: 8px;
+}
+
+/* List Block Styles */ *
+
+.tnp-select2-option {
+    /* background-color: red; */
+}
+
+.tnp-select2-option img {
+    height: 15px;
+    margin-right: 5px;
+    vertical-align: middle;
+    background-color: rgba(234, 234, 234, 0.25);
+    padding: 10px;
+    border-radius: 5px;
+}
+
+/* ************************************************************************** */
+/* Block options layer over the sidebar */
+
+/* Main container */
+#tnpc-block-options {
+    height: 100vh;
+    z-index: 10;
+    display: none;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    bottom: 0;
+    right: 0;
+    background-color: #ECF0F1;
+    padding: 0;
+}
+
+/* Form */
+form#tnpc-block-options-form {
+    background-color: #fff;
+    padding: 15px;
+    margin-top: 50px;
+}
+
+#tnpc-block-options-form, #tnpc-block-options-form p {
+    color: #444;
+    background-color: #ECF0F1 !important;
+}
+
+
+#tnpc-block-options-form h3 {
+    color: #000;
+}
+
+#tnpc-block-options-form table.form-table th {
+    /*background-color: #f4f4f4;*/
+    width: 100%;
+    vertical-align: top;
+    float: left;
+    font-weight: normal;
+    text-transform: uppercase;
+    font-size: 13px;
+    padding-top: 10px;
+    padding-bottom: 5px;
+    padding-left: 0;
+    padding-right: 0;
+
+}
+
+#tnpc-block-options-form table.form-table td {
+    float: left;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    width: 100%;
+}
+
+#tnpc-block-options-form table.form-table {
+    margin: 0px;
+    border-collapse: separate!important;
+    border-spacing: 1px!important;
+} 
+
+#tnpc-block-options-form table.form-table table.tnp-button-colors {
+    border: 0;
+    border-collapse: collapse;
+}
+#tnpc-block-options-form table.form-table table.tnp-button-colors td {
+    border: 0;
+    padding-top: 0;
+}
+
+/* Save and cancel button container */
+#tnpc-block-options-buttons {
+    padding: 20px;
+    text-align: right;
+    background-color: #ecf0f1;
+    width: 31%;
+    position: fixed;
+    height: 70px;
+    border-bottom: 1px solid #ffffff;
+    z-index: 9999999;
+}
+
+#tnpc-block-options-save{
+}
+
+#tnpc-block-options-save:hover {
+}
+
+#tnpc-block-options-cancel{
+}
+
+#tnpc-block-options-cancel:hover {
+}
+
+
+/* Style the tab */
+.tnpc-tabs {
+    overflow: hidden;
+    background-color: #fff;
+    font-family: Montserrat, sans-serif;
+}
+
+/* Style the buttons that are used to open the tab content */
+.tnpc-tabs button {
+    background-color: inherit;
+    float: left;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 14px 16px;
+    transition: 0.3s;
+    color: #6a8ba0;
+}
+
+/* Change background color of buttons on hover */
+.tnpc-tabs button:hover {
+    background-color: #ddd;
+}
+
+/* Create an active/current tablink class */
+.tnpc-tabs button.active {
+    background-color: #ECF0F1;
+    color: #3498DB;
+}
+
+/* Style the tab content */
+.tabcontent {
+    display: none;
+    padding: 6px 12px;
+    border-top: none;
+}
+
+/* Style Reset, Save, Save & Preview footer */
+
+.tnpc-controls {
+    text-align: right;
+}
+
+.tnpc-logo {
+    float: left;
+}
+
+.tnpc-logo p {
+    font-family: Montserrat, Sans-serif;
+    color: #fff !important;
+    font-size: 16px;
+    margin-left: 20px !important;
+    margin-top: 5px !important;
+}
+
+/* Style Subject Area */
+/* No influenza anche il contenuto della mail */
+#newsletter-builder-area p {
+    /*background-color: #ECF0F1;
+    padding: 15px;*/
+}
+
+/* Global Options elements style */
+
+#tnpc-general-options select {
+    box-shadow: none;
+    border-radius: 0px;
+    border: none;
+    margin-right: 5px;
+}
+
+/* Blocks options global styles */
+
+.tnpc-block-options-warning {
+    background-color: #def9e9;
+    padding: 10px 15px;
+}
+
+/* Presets */
+
+.tnpc-presets-title {
+    padding: 0px 20px 25px;
+    font-size: 21px;
+    margin-bottom: 30px;
+    color: #484848;
+    border-bottom: 3px solid white;
+}
+
+.tnpc-preset {
+    float: left;
+    margin: 15px;
+    cursor: pointer;
+    width: 150px;
+    height: 263px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 0 2px 0px #dee3e4;
+    position: relative;
+}
+
+.tnpc-preset:hover {
+    box-shadow: 0 0 8px 8px #dee3e4;
+}
+
+.tnpc-preset-label {
+    position: absolute;
+    top: 200px;
+    left: 50%;
+    text-align: center;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    width: 80%;
 }

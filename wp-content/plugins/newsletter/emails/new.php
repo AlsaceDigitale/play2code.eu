@@ -1,48 +1,56 @@
 <?php
 require_once NEWSLETTER_INCLUDES_DIR . '/controls.php';
+
 $controls = new NewsletterControls();
 $module = NewsletterEmails::instance();
 
 if ($controls->is_action('theme')) {
-    $controls->merge($module->themes->get_options($controls->data['theme']));
-    $module->save_options($controls->data);
+    if ($controls->data['theme'] != 'rawhtml') {
+        $controls->merge($module->themes->get_options($controls->data['theme']));
+        $module->save_options($controls->data);
+    }
 
     // If this theme has no intermediate options...
-    if (!file_exists($module->get_current_theme_file_path('theme-options.php'))) {
+    if ($controls->data['theme'] == 'rawhtml' || !file_exists($module->get_current_theme_file_path('theme-options.php'))) {
         $email = array();
         $email['status'] = 'new';
         $email['subject'] = __('Here the email subject', 'newsletter');
-        $email['track'] = 1;
+        $email['track'] = Newsletter::instance()->options['track'];
         $email['token'] = $module->get_token();
 
-        $theme_options = $module->get_current_theme_options();
-        $theme_url = $module->get_current_theme_url();
-        $theme_subject = '';
+        if ($controls->data['theme'] == 'rawhtml') {
+            $email['editor'] = NewsletterEmails::EDITOR_HTML;
+            $email['message'] = "<!DOCTYPE html>\n<html>\n<head>\n<title>Your email title</title>\n</head>\n<body>\n</body>\n</html>";
+        } else {
+            $theme_options = $module->get_current_theme_options();
+            $theme_url = $module->get_current_theme_url();
+            $theme_subject = '';
 
-        ob_start();
-        include $module->get_current_theme_file_path('theme.php');
-        $email['message'] = ob_get_clean();
+            ob_start();
+            include $module->get_current_theme_file_path('theme.php');
+            $email['message'] = ob_get_clean();
 
-        if (!empty($theme_subject)) {
-            $email['subject'] = $theme_subject;
+            if (!empty($theme_subject)) {
+                $email['subject'] = $theme_subject;
+            }
+
+            $file = $module->get_current_theme_file_path('theme-text.php');
+            if (file_exists($file)) {
+                ob_start();
+                include $module->get_current_theme_file_path('theme-text.php');
+                $email['message_text'] = ob_get_clean();
+            } else {
+                $email['message_text'] = 'You need a modern email client to read this email. Read it online: {email_url}.';
+            }
+            $email['editor'] = NewsletterEmails::EDITOR_TINYMCE;
         }
-
-        ob_start();
-        include $module->get_current_theme_file_path('theme-text.php');
-        $email['message_text'] = ob_get_clean();
 
         $email['type'] = 'message';
         $email['send_on'] = time();
         $email = Newsletter::instance()->save_email($email);
-        ?>
-        <script>
-            location.href = "<?php echo $module->get_admin_page_url('edit'); ?>&id=<?php echo $email->id; ?>";
-        </script>
-        <div class="wrap">
-            <p>If you are not automatically redirected to the composer, <a href="<?php echo $module->get_admin_page_url('edit'); ?>&id=<?php echo $email->id; ?>">click here</a>.</p>
-        </div>
-        <?php
-        return;
+        
+        $controls->js_redirect($module->get_editor_url($email->id, $email->editor));
+        return;        
     }
 }
 
@@ -57,7 +65,7 @@ if ($controls->is_action('create')) {
     $email = array();
     $email['status'] = 'new';
     $email['subject'] = __('Here the email subject', 'newsletter');
-    $email['track'] = 1;
+    $email['track'] = Newsletter::instance()->options['track'];
 
     $theme_options = $module->get_current_theme_options();
 
@@ -123,23 +131,23 @@ function newsletter_emails_get_theme_options($theme) {
 }
 ?>
 
-<div class="wrap" id="tnp-wrap">
+<div class="wrap tnp-emails tnp-emails-new" id="tnp-wrap">
 
-	<?php include NEWSLETTER_DIR . '/tnp-header.php'; ?>
+    <?php include NEWSLETTER_DIR . '/tnp-header.php'; ?>
 
-	<div id="tnp-heading">
+    <div id="tnp-heading">
 
         <h2><?php _e('Create a newsletter', 'newsletter') ?>
             <a class="tnp-btn-h1" href="<?php echo NewsletterEmails::instance()->get_admin_page_url('theme'); ?>"><?php _e('Back to newsletter themes', 'newsletter') ?></a>
         </h2>
-            <br>
-            <p>Theme options are saved for next time you'll use this theme.</p>
+        <br>
+        <p>Theme options are saved for next time you'll use this theme.</p>
 
-           </div>
+    </div>
 
-	<div id="tnp-body" class="tnp-body-lite"> 
+    <div id="tnp-body" class="tnp-body-lite"> 
 
-        <form method="post" action="<?php echo $module->get_admin_page_url('new'); ?>">
+        <form method="post" action="">
             <?php $controls->init(); ?>
             <?php $controls->hidden('theme'); ?>
 
@@ -150,16 +158,18 @@ function newsletter_emails_get_theme_options($theme) {
 
                     </td>
                     <td style="text-align: left; vertical-align: top; border-bottom: 1px solid #ddd; padding-bottom: 10px">
-                        <div style="float: right"><?php $controls->button_primary('create', 'Proceed to edit &raquo;', 'this.form.action=\'' . home_url('/') . '?na=emails-create\';this.form.submit()'); ?></div>
+                        <div style="float: right"><?php $controls->button_primary('create', 'Proceed to edit &raquo;', 'this.form.action=\'' . home_url('/', is_ssl() ? 'https' : 'http') . '?na=emails-create\';this.form.submit()'); ?></div>
                         <img style="position: relative; left: 5px; top: 10px;"src="<?php echo plugins_url('newsletter') ?>/images/arrow.png" height="35">
                     </td>
                 </tr>
                 <tr>
-                    <td style="width: 600px; vertical-align: top; padding-top: 10px">
+                    <td style="width: 500px; vertical-align: top;">
+                        <div class="tnp-emails-theme-options">
                         <?php @include $module->get_current_theme_file_path('theme-options.php'); ?>
+                        </div>
                     </td>
                     <td style="vertical-align: top; padding-top: 15px; padding-left: 15px">
-                        <iframe src="<?php echo wp_nonce_url(home_url('/') . '?na=emails-preview&ts=' . time(), 'view'); ?>" height="700" style="width: 100%; border: 1px solid #ccc"></iframe>
+                        <iframe src="<?php echo wp_nonce_url(home_url('/', is_ssl() ? 'https' : 'http') . '?na=emails-preview&ts=' . time(), 'view'); ?>" height="700" style="width: 100%; border: 1px solid #ccc"></iframe>
                     </td>
                 </tr>
             </table>
@@ -168,5 +178,5 @@ function newsletter_emails_get_theme_options($theme) {
     </div>
 
     <?php include NEWSLETTER_DIR . '/tnp-footer.php'; ?>
-    
+
 </div>

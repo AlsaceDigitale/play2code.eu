@@ -112,7 +112,7 @@
 /* Subscribers Gender Box */
 
 #tnp-gender-chart {
-    width: 80%;
+    width: 90%;
     margin: 0 auto;
 }
 
@@ -122,22 +122,8 @@
 #tnp-events-chart {
     width: 80%;
     margin: 0 auto;
-    
+    height: 300px;
 }
-
-/* Urls Clicked */
-
-.widefat th {
-    font-family: "Source Sans Pro", sans-serif;
-    color: #2C3E50;
-    text-transform: uppercase; 
-}
-
-.widefat {
-    padding: 0px 10px;
-    margin: 0 auto;
-}
-
 
 /* Retarget Table Layout */
 
@@ -149,6 +135,10 @@
 .tnp-retarget .tnp-retarget-table th {
     color: #fff;
     border: none;
+}
+
+#tnp-body.tnp-statistics .tnp-widget {
+    min-height: 500px;
 }
 
 

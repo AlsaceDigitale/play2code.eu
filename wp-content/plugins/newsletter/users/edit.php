@@ -1,23 +1,27 @@
 <?php
-if (!defined('ABSPATH')) exit;
+defined('ABSPATH') || exit;
 
 require_once NEWSLETTER_INCLUDES_DIR . '/controls.php';
 $controls = new NewsletterControls();
 $module = NewsletterUsers::instance();
 
 $id = (int) $_GET['id'];
+$user = $module->get_user($id);
 
 if ($controls->is_action('save')) {
 
     $email = $module->normalize_email($controls->data['email']);
-    if ($email == null) {
-        $controls->errors = 'The email address is not valid';
+    if (empty($email)) {
+        $controls->errors = __('Wrong email address', 'newsletter');
+    } else {
+        $controls->data['email'] = $email;
     }
 
+
     if (empty($controls->errors)) {
-        $user = $module->get_user($controls->data['email']);
-        if ($user && $user->id != $id) {
-            $controls->errors = 'The email address is already taken by another subscriber';
+        $u = $module->get_user($controls->data['email']);
+        if ($u && $u->id != $id) {
+            $controls->errors = __('The email address is already in use', 'newsletter');
         }
     }
 
@@ -29,13 +33,18 @@ if ($controls->is_action('save')) {
             }
         }
 
+        if (empty($controls->data['token'])) {
+            $controls->data['token'] = $module->get_token();
+        }
+
         $controls->data['id'] = $id;
-        $r = $module->save_user($controls->data);
-        if ($r === false) {
-            $controls->errors = 'Unable to update, may be the email (if changed) is duplicated.';
+        $user = $module->save_user($controls->data);
+        $module->add_user_log($user, 'edit');
+        if ($user === false) {
+            $controls->errors = __('Error. Check the log files.', 'newsletter');
         } else {
-            $controls->messages = 'Updated.';
-            $controls->data = $module->get_user($id, ARRAY_A);
+            $controls->add_message_saved();
+            $controls->data = (array) $user;
         }
     }
 }
@@ -47,27 +56,24 @@ if ($controls->is_action('delete')) {
 }
 
 if (!$controls->is_action()) {
-    $controls->data = $module->get_user($id, ARRAY_A);
+    $controls->data = (array) $user;
 }
 
-$options_profile = get_option('newsletter_profile');
-
-$panels = Newsletter::instance()->panels;
-
-//$wpdb->query($wpdb->prepare("insert ignore into " . $wpdb->prefix . "newsletter_sent (user_id, email_id, time) select user_id, email_id, UNIX_TIMESTAMP(created) from " . NEWSLETTER_STATS_TABLE . " where user_id=%d", $id));
+$options_profile = NewsletterSubscription::instance()->get_options('profile');
 
 function percent($value, $total) {
-    if ($total == 0)
+    if ($total == 0) {
         return '-';
+    }
     return sprintf("%.2f", $value / $total * 100) . '%';
 }
 
 function percentValue($value, $total) {
-    if ($total == 0)
+    if ($total == 0) {
         return 0;
+    }
     return round($value / $total * 100);
 }
-    
 ?>
 
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
@@ -75,226 +81,253 @@ function percentValue($value, $total) {
     google.charts.load('current', {'packages': ['corechart', 'geomap']});
 </script>
 
-<div class="wrap" id="tnp-wrap">
+<div class="wrap tnp-users tnp-users-edit" id="tnp-wrap">
 
     <?php include NEWSLETTER_DIR . '/tnp-header.php'; ?>
 
-	<div id="tnp-heading">
+    <div id="tnp-heading">
 
-        <h2><?php _e('Editing', 'newsletter') ?> <?php echo esc_html($controls->data['email'])?></h2>
+        <h2><?php _e('Editing', 'newsletter') ?> <?php echo esc_html($controls->data['email']) ?></h2>
 
-        </div>
+    </div>
 
-	<div id="tnp-body">
-        
-    <form method="post" action="">
-        <p>
-            <?php $controls->button_back('?page=newsletter_users_index'); ?>
-            <?php $controls->button_save(); ?>
-        </p>
-        <?php $controls->init(); ?>
+    <div id="tnp-body">
 
-        <div id="tabs">
+        <form method="post" action="">
+            <p>
+                <?php $controls->button_back('?page=newsletter_users_index'); ?>
+                <?php $controls->button_save(); ?>
+            </p>
+            <?php $controls->init(); ?>
 
-            <ul>
-                <li><a href="#tabs-general">General</a></li>
-                <li><a href="#tabs-preferences">Lists</a></li>
-                <li><a href="#tabs-profile">Profile</a></li>
-                <li><a href="#tabs-other">Other</a></li>
-		<li><a href="#tabs-newsletters">Newsletters</a></li>
-                
-            </ul>
+            <div id="tabs">
 
-            <div id="tabs-general">
-	    
-		<?php do_action('newsletter_users_edit_general', $id) ?>
-                
-                <table class="form-table">
+                <ul>
+                    <li><a href="#tabs-general"><?php _e('General', 'newsletter') ?></a></li>
+                    <li><a href="#tabs-preferences"><?php _e('Lists', 'newsletter') ?></a></li>
+                    <li><a href="#tabs-profile"><?php _e('Extra fields', 'newsletter') ?></a></li>
+                    <li><a href="#tabs-other"><?php _e('Other', 'newsletter') ?></a></li>
+                    <li><a href="#tabs-newsletters"><?php _e('Newsletters', 'newsletter') ?></a></li>
+                    <li><a href="#tabs-history"><?php _e('Logs', 'newsletter') ?></a></li>
 
-                        <tr valign="top">
-                        <th>Email address</th>
-                        <td>
-                            <?php $controls->text('email', 60); ?>
-                        </td>
-                    </tr>
-                    <tr valign="top">
-                        <th>First name</th>
-                        <td>
-                            <?php $controls->text('name', 50); ?>
-                            <p class="description">
-                                If you collect only the name of the subscriber without distinction of first and last name this field is used.
-                            </p>
-                        </td>
-                    </tr>
-                    <tr valign="top">
-                        <th>Last name</th>
-                        <td>
-                            <?php $controls->text('surname', 50); ?>
-                        </td>
-                    </tr>
-                    <tr valign="top">
-                        <th>Gender</th>
-                        <td>
-                            <?php $controls->select('sex', array('n' => 'Not specified', 'f' => 'female', 'm' => 'male')); ?>
-                        </td>
-                    </tr>
-                    <tr valign="top">
-                        <th>Status</th>
-                        <td>
-                            <?php $controls->select('status', array('C' => 'Confirmed', 'S' => 'Not confirmed', 'U' => 'Unsubscribed', 'B' => 'Bounced')); ?>
-                        </td>
-                    </tr>
-                    <tr valign="top">
-                        <th>Test subscriber?</th>
-                        <td>
-                            <?php $controls->yesno('test'); ?>
-                            <p class="description">
-                                A test subscriber is a regular subscriber that is even used as recipint when sending test newsletter are sent
-                                (for example to check the layout).
-                            </p>
-                        </td>
-                    </tr>
+                </ul>
 
-                    <?php do_action('newsletter_user_edit_extra', $controls); ?>
+                <div id="tabs-general" class="tnp-tab">
 
-                    <tr valign="top">
-                        <th>Feed by mail</th>
-                        <td>
-                            <?php $controls->yesno('feed'); ?>
-                            <p class="description">
-                                "Yes" when this subscriber has the feed by mail service active. The 
-                                <a href="http://www.thenewsletterplugin.com/feed-by-mail-extension?utm_source=plugin&utm_medium=link&utm_campaign=newsletter-feed" target="_blank">feed by mail is an extension of this plugin</a>.
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-            <div id="tabs-preferences">
-                <div class="tab-preamble">
-                    <p>
-                        The subscriber's preferences are a set of "on/off" fields that can be used while sending newsletter to
-                        select a subset of subscribes. 
-                    </p>
-                </div>
-                <table class="form-table">
-                    <tr>
-                        <th>Preferences</th>
-                        <td>
-                            <?php $controls->preferences('list'); ?>
-                        </td>
-                    </tr>
-                </table>
-            </div>
+                    <?php do_action('newsletter_users_edit_general', $id, $controls) ?>
 
-            <div id="tabs-profile">
-                <div class="tab-preamble">
-                    <p>
-                        The user's profile is a set of optional and textual fields you can collect along with the subscription process
-                        or when the user's editing his profile. Those fields can be configured in the "Subscription Form" panel.
-                    </p>
-                </div>
-                <table class="widefat">
-                    <thead>
+                    <table class="form-table">
+
                         <tr>
-                            <th>Number</th>
-                            <th>Name</th>
-                            <th>Value</th>
+                            <th><?php _e('Email', 'newsletter'); ?></th>
+                            <td>
+                                <?php $controls->text_email('email', 60); ?>
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody>
+                        <tr>
+                            <th><?php _e('First name', 'newsletter'); ?></th>
+                            <td>
+                                <?php $controls->text('name', 50); ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><?php _e('Last name', 'newsletter'); ?></th>
+                            <td>
+                                <?php $controls->text('surname', 50); ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><?php _e('Gender', 'newsletter'); ?></th>
+                            <td>
+                                <?php $controls->select('sex', array('n' => 'Not specified', 'f' => 'female', 'm' => 'male')); ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><?php _e('Status', 'newsletter'); ?></th>
+                            <td>
+                                <?php $controls->select('status', array('C' => 'Confirmed', 'S' => 'Not confirmed', 'U' => 'Unsubscribed', 'B' => 'Bounced')); ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><?php _e('Language', 'newsletter'); ?></th>
+                            <td>
+                                <?php $controls->language(); ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><?php _e('Test subscriber', 'newsletter'); ?>
+                                <br><?php $controls->help('https://www.thenewsletterplugin.com/documentation/subscribers#test-subscribers') ?></th>
+                            <td>
+                                <?php $controls->yesno('test'); ?>
+                            </td>
+                        </tr>
+
+                        <?php do_action('newsletter_user_edit_extra', $controls); ?>
+
+                        <tr>
+                            <th>Feed by mail</th>
+                            <td>
+                                <?php $controls->yesno('feed'); ?>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div id="tabs-preferences" class="tnp-tab">
+                    <table class="form-table">
+                        <tr>
+                            <th><?php _e('Lists', 'newsletter') ?><br><?php echo $controls->help('https://www.thenewsletterplugin.com/plugins/newsletter/newsletter-preferences') ?></th>
+                            <td>
+                                <?php $controls->preferences('list'); ?>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div id="tabs-profile" class="tnp-tab">
+
+                    <table class="widefat">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th><?php _e('Name', 'newsletter'); ?></th>
+                                <th><?php _e('Value', 'newsletter'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            for ($i = 1; $i <= NEWSLETTER_PROFILE_MAX; $i++) {
+                                echo '<tr><td>';
+                                echo $i;
+                                echo '</td><td>';
+                                echo esc_html($options_profile['profile_' . $i]);
+                                echo '</td><td>';
+                                $controls->text('profile_' . $i, 70);
+                                echo '</td></tr>';
+                            }
+                            ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="tabs-other" class="tnp-tab">
+
+                    <table class="form-table">
+                        <tr>
+                            <th>ID</th>
+                            <td>
+                                <?php $controls->value('id'); ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><?php _e('Created', 'newsletter') ?></th>
+                            <td>
+                                <?php echo $controls->print_date(strtotime($controls->data['created'])); ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><?php _e('Last activity', 'newsletter') ?></th>
+                            <td>
+                                <?php echo $controls->print_date($controls->data['last_activity']); ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><?php _e('WP user ID', 'newsletter') ?></th>
+                            <td>
+                                <?php $controls->text('wp_user_id'); ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><?php _e('IP address', 'newsletter'); ?></th>
+                            <td>
+                                <?php $controls->value('ip'); ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><?php _e('Secret token', 'newsletter'); ?></th>
+                            <td>
+                                <?php $controls->text('token', 50); ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><?php _e('Profile URL', 'newsletter'); ?></th>
+                            <td>
+                                <?php $profile_url = NewsletterProfile::instance()->get_profile_url($user) ?>
+                                <a href='<?php echo $profile_url ?>' target="_blank"><?php echo $profile_url ?></a>
+                            </td>
+                        </tr>
+
+                    </table>
+                </div>
+                <div id="tabs-newsletters" class="tnp-tab">
+                    <?php if (!has_action('newsletter_user_newsletters_tab') && !has_action('newsletter_users_edit_newsletters')) { ?>
+                        <div class="tnp-tab-notice">
+                            This panel requires the <a href="https://www.thenewsletterplugin.com/plugins/newsletter/reports-module" target="_blank">Reports Extension 4+</a>.
+                        </div>
                         <?php
-                        for ($i = 1; $i <= NEWSLETTER_PROFILE_MAX; $i++) {
-                            echo '<tr><td>(' . $i . ') ';
-                            echo '</td><td>';
-                            echo esc_html($options_profile['profile_' . $i]);
-                            echo '</td><td>';
-                            $controls->text('profile_' . $i, 70);
-                            echo '</td></tr>';
-                        }
-                        ?>
-                    </tbody>
-                </table>
-            </div>
-
-            <div id="tabs-other">
-                <div class="tab-preamble">
-                    <p>
-                        Other user's data collected or generated along the subscription process.
-                    </p>
-                </div>
-                <table class="form-table">
-                    <tr valign="top">
-                        <th>Subscriber ID</th>
-                        <td>
-                            <?php $controls->value('id'); ?>
-                        </td>
-                    </tr>
-                    <tr valign="top">
-                        <th>Created</th>
-                        <td>
-                            <?php $controls->value('created'); ?>
-                        </td>
-                    </tr>
-                    <tr valign="top">
-                        <th>From IP address</th>
-                        <td>
-                            <?php $controls->value('ip'); ?>
-                            <p class="description">
-                                Internet address from which the subscription started. Required by many providers.
-                            </p>
-                        </td>
-                    </tr>
-                    <tr valign="top">
-                        <th>Secret token</th>
-                        <td>
-                            <?php $controls->text('token', 50); ?>
-                            <p class="description">
-                                This secret token is used to access the profile page and edit profile data, to confirm and cancel the subscription.
-                            </p>
-                        </td>
-                    </tr>
-                    <tr valign="top">
-                        <th>Profile URL</th>
-                        <td>
-                            <?php echo esc_html(home_url('/') . '?na=pe&nk=' . $id . '-' . $controls->data['token']) ?>
-                            <p class="description">
-                                The URL which lands on the user profile editing page. It can be added on newsletters using the {profile_url} tag.
-                            </p>
-                        </td>
-                    </tr>
-
-                </table>
-            </div>
-            <div id="tabs-newsletters">
-                <p>Newsletter sent to this subscriber.</p>
-                <?php if (!has_action('newsletter_user_newsletters_tab') && !has_action('newsletter_users_edit_newsletters')) { ?>
-                <div class="tnp-tab-notice">
-                    This panel requires the <a href="http://www.thenewsletterplugin.com/plugins/newsletter/reports-module" target="_blank">Reports Extension 4+</a>.
-                </div>
-                <?php } else {
-                    do_action('newsletter_user_newsletters_tab', $id);
-                    do_action('newsletter_users_edit_newsletters', $id);
-                }?>
-            </div>
-            
-            <?php 
-                if (isset($panels['user_edit'])) { 
-                    foreach ($panels['user_edit'] as $panel) {
-                        call_user_func($panel['callback'], $id, $controls);
+                    } else {
+                        do_action('newsletter_user_newsletters_tab', $id);
+                        do_action('newsletter_users_edit_newsletters', $id);
                     }
-                }
-            ?>
-            
-        </div>
+                    ?>
+                </div>
 
-        <p class="submit">
-            <?php $controls->button_save(); ?>
-            <?php $controls->button('delete', 'Delete'); ?>
-        </p>
+                <div id="tabs-history" class="tnp-tab">
+                    <?php
+                    $logs = $wpdb->get_results($wpdb->prepare("select * from {$wpdb->prefix}newsletter_user_logs where user_id=%d order by id desc", $id));
+                    ?>
+                    <?php if (empty($logs)) { ?>
+                        <p>No logs available</p>
+                    <?php } else { ?>
+                        <p>Only public lists are recorded.</p>
+                        <table class="widefat" style="width: auto">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Source</th>
+                                    <th>IP</th>
+                                    <th>Lists</th>
+                                </tr>
 
-    </form>
-</div>
+                            <tbody>
+                                <?php foreach ($logs as $log) { ?>
+                                    <?php
+                                    $data = json_decode($log->data, ARRAY_A);
+                                    if (isset($data['new']))
+                                        $data = $data['new'];
+                                    ?>
+                                    <tr>
+                                        <td><?php echo $controls->print_date($log->created) ?></td>
+                                        <td><?php echo esc_html($log->source) ?></td>
+                                        <td><?php echo esc_html($log->ip) ?></td>
+                                        <td>
+                                            <?php
+                                            if (is_array($data)) {
+                                                foreach ($data as $key => $value) {
+                                                    echo esc_html(str_replace('_', ' ', $key)), ': ', esc_html($value) . '<br>';
+                                                }
+                                            }
+                                            ?>
+                                        </td>
+                                    </tr>
+    <?php } ?>
+                            </tbody>
 
-    <?php include NEWSLETTER_DIR . '/tnp-footer.php'; ?>
-    
+                        </table>
+<?php } ?>
+
+
+                </div>
+
+            </div>
+
+            <p>
+                <?php $controls->button_save(); ?>
+<?php $controls->button_delete(); ?>
+            </p>
+
+        </form>
+    </div>
+
+<?php include NEWSLETTER_DIR . '/tnp-footer.php'; ?>
+
 </div>
