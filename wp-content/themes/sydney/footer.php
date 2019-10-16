@@ -21,9 +21,9 @@
 
 	<footer id="colophon" class="site-footer" role="contentinfo">
 		<div class="site-info container">
-            <a href="http://www.play2code.eu/mentions-legales/">Mentions Légales | </a>
-			<a href="http://www.alsacedigitale.org/">© 2016 Alsace Digitale</a>
-p		</div><!-- .site-info -->
+			<a href="http://www.alsacedigitale.org/">© 2016 Alsace Digitale | </a>
+            <a href="http://www.play2code.eu/mentions-legales/">Mentions Légales</a>
+		</div><!-- .site-info -->
 	</footer><!-- #colophon -->
 
 	<?php do_action('sydney_after_footer'); ?>
