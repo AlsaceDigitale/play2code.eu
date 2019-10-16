@@ -65,20 +65,21 @@ class BP_EM_Component extends BP_Component {
 		//check multisite or normal mode for correct permission checking
 		if(is_multisite() && $blog_id != BP_ROOT_BLOG){
 			//FIXME MS mode doesn't seem to recognize cross subsite caps, using the proper functions, for now we use switch_blog.
-			$current_blog = $blog_id;
 			switch_to_blog(BP_ROOT_BLOG);
 			$can_manage_events = current_user_can_for_blog(BP_ROOT_BLOG, 'edit_events');
 			$can_manage_locations = current_user_can_for_blog(BP_ROOT_BLOG, 'edit_locations');
 			$can_manage_bookings = current_user_can_for_blog(BP_ROOT_BLOG, 'manage_bookings');
-			switch_to_blog($current_blog);
+			restore_current_blog();
 		}else{
 			$can_manage_events = current_user_can('edit_events');
 			$can_manage_locations = current_user_can('edit_locations');
 			$can_manage_bookings = current_user_can('manage_bookings');
 		}
 		/* Add 'Events' to the main user profile navigation */
+		$event_count = EM_Events::count( array( 'scope'=>'future',  'owner'=> bp_displayed_user_id() ));
+		if( empty($event_count) ) $event_count = 0;
 		$main_nav = array(
-			'name' => __( 'Events', 'events-manager'),
+			'name' => __( 'Events', 'events-manager'). '<span>'.esc_html($event_count).'</span>',
 			'slug' => em_bp_get_slug(),
 			'position' => 80,
 			'screen_function' => 'bp_em_events',
@@ -176,7 +177,7 @@ class BP_EM_Component extends BP_Component {
 				$can_manage_events = current_user_can_for_blog(BP_ROOT_BLOG, 'edit_events');
 				$can_manage_locations = current_user_can_for_blog(BP_ROOT_BLOG, 'edit_locations');
 				$can_manage_bookings = current_user_can_for_blog(BP_ROOT_BLOG, 'manage_bookings');
-				switch_to_blog($current_blog);
+				restore_current_blog();
 			}else{
 				$can_manage_events = current_user_can('edit_events');
 				$can_manage_locations = current_user_can('edit_locations');
@@ -288,8 +289,13 @@ if( !is_admin() || ( defined('DOING_AJAX') && !empty($_REQUEST['is_public'])) ){
 		global $bp;
 		return $bp->events->link.'my-events/?action=edit&event_id='.$EM_Event->event_id;
 	}
+	function em_bp_rewrite_events_admin_url( $url ){
+		global $bp;
+	    return $bp->events->link.'my-events/';
+	}
 	if( !get_option('dbem_edit_events_page') ){
 		add_filter('em_event_get_edit_url','em_bp_rewrite_edit_url',10,2);
+		add_filter('em_get_events_admin_url','em_bp_rewrite_edit_url',10,2);
 	}	
 	
 	function em_bp_rewrite_bookings_url($url, $EM_Event){
@@ -312,8 +318,8 @@ if( !is_admin() || ( defined('DOING_AJAX') && !empty($_REQUEST['is_public'])) ){
 //CSS and JS Loading
 function bp_em_enqueue_scripts( ){
 	if( bp_is_current_component('events') || (bp_is_current_component('groups') && bp_is_current_action('group-events')) ){
-	    add_filter('option_dbem_js_limit', create_function('$args','return false;'));
-	    add_filter('option_dbem_css_limit', create_function('$args','return false;'));
+	    add_filter('option_dbem_js_limit', '__return_false');
+	    add_filter('option_dbem_css_limit', '__return_false');
 	}
 	
 }

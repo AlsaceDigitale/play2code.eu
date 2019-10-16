@@ -1,8 +1,10 @@
 <?php
 // TODO make person details more secure and integrate with WP user data 
 class EM_Person extends WP_User{
-	
-	function __construct( $person_id = 0, $username = '', $blog_id='' ){
+
+    public $custom_user_fields = array();
+
+	function __construct( $person_id = false, $username = '', $blog_id='' ){
 		if( is_array($person_id) ){
 			if( array_key_exists('person_id',$person_id) ){
 				$person_id = $person_id['person_id'];
@@ -16,11 +18,11 @@ class EM_Person extends WP_User{
 		}
 		if($username){
 			parent::__construct($person_id, $username);
-		}elseif( is_numeric($person_id) && ($person_id <= 0) ){
+		}elseif( is_numeric($person_id) && $person_id == 0 ){
 			$this->data = new stdClass();
 			$this->ID = 0;
-			$this->display_name = 'Non-Registered User';
-			$this->user_email = '';
+			$this->display_name = 'Anonymous User';
+			$this->user_email = 'anonymous@'.preg_replace('/https?:\/\//', '', get_site_url());
 		}else{
 			parent::__construct($person_id);
 		}
@@ -84,14 +86,13 @@ class EM_Person extends WP_User{
 	
 	function display_summary(){
 		ob_start();
-		$no_user = get_option('dbem_bookings_registration_disable') && $this->ID == get_option('dbem_bookings_registration_user');
 		?>
 		<table class="em-form-fields">
 			<tr>
 				<td><?php echo get_avatar($this->ID); ?></td>
 				<td style="padding-left:10px; vertical-align: top;">
 					<table>
-						<?php if( $no_user ): ?>
+						<?php if( $this->ID === 0 ): ?>
 						<tr><th><?php _e('Name','events-manager'); ?> : </th><th><?php echo $this->get_name(); ?></th></tr>
 						<?php else: ?>
 						<tr><th><?php _e('Name','events-manager'); ?> : </th><th><a href="<?php echo $this->get_bookings_url(); ?>"><?php echo $this->get_name(); ?></a></th></tr>
@@ -105,7 +106,17 @@ class EM_Person extends WP_User{
 		<?php
 		return apply_filters('em_person_display_summary', ob_get_clean(), $this);
 	}
-	
+
+	function get_summary(){
+	    $summary = array(
+            'dbem_phone' => array('name' => __('Name','events-manager'), 'value' => $this->get_name()),
+		    'user_name' => array('name' => __('Email','events-manager'), 'value' => $this->user_email),
+		    'user_email' => array('name' => __('Phone','events-manager'), 'value' => $this->phone),
+        );
+	    $summary = array_merge( $summary, $this->custom_user_fields );
+	    return apply_filters('em_person_get_summary', $summary, $this);
+    }
+
 	function get_name(){
 		$full_name = $this->first_name  . " " . $this->last_name ;
 		$full_name = wp_kses_data(trim($full_name));

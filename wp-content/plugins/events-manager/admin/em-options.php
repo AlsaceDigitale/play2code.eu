@@ -2,7 +2,7 @@
 
 //Function composing the options subpanel
 function em_options_save(){
-	global $EM_Notices;
+	global $EM_Notices; /* @var EM_Notices $EM_Notices */
 	/*
 	 * Here's the idea, we have an array of all options that need super admin approval if in multi-site mode
 	 * since options are only updated here, its one place fit all
@@ -11,13 +11,13 @@ function em_options_save(){
 		//Build the array of options here
 		$post = $_POST;
 		foreach ($_POST as $postKey => $postValue){
-			if( substr($postKey, 0, 5) == 'dbem_' ){
+			if( $postKey != 'dbem_data' && substr($postKey, 0, 5) == 'dbem_' ){
 				//TODO some more validation/reporting
 				$numeric_options = array('dbem_locations_default_limit','dbem_events_default_limit');
 				if( in_array($postKey, array('dbem_bookings_notify_admin','dbem_event_submitted_email_admin','dbem_js_limit_events_form','dbem_js_limit_search','dbem_js_limit_general','dbem_css_limit_include','dbem_css_limit_exclude','dbem_search_form_geo_distance_options')) ){ $postValue = str_replace(' ', '', $postValue); } //clean up comma separated emails, no spaces needed
 				if( in_array($postKey,$numeric_options) && !is_numeric($postValue) ){
 					//Do nothing, keep old setting.
-				}elseif( $postKey == 'dbem_category_default_color' && !preg_match("/^#([abcdef0-9]{3}){1,2}?$/i",$postValue)){
+				}elseif( ($postKey == 'dbem_category_default_color' || $postKey == 'dbem_tag_default_color') && !sanitize_hex_color($postValue) ){
 					$EM_Notices->add_error( sprintf(esc_html_x('Colors must be in a valid %s format, such as #FF00EE.', 'hex format', 'events-manager'), '<a href="http://en.wikipedia.org/wiki/Web_colors">hex</a>').' '. esc_html__('This setting was not changed.', 'events-manager'), true);					
 				}else{
 					//TODO slashes being added?
@@ -28,10 +28,20 @@ function em_options_save(){
 					}
 					update_option($postKey, $postValue);
 				}
+			}elseif( $postKey == 'dbem_data' && is_array($postValue) ){
+				foreach( $postValue as $postK => $postV ){
+					//TODO slashes being added?
+					if( is_array($postV) ){
+						foreach($postV as $postValue_key=>$postValue_val) $postV[$postValue_key] = wp_unslash($postValue_val);
+					}else{
+						$postV = wp_unslash($postV);
+					}
+					EM_Options::set( $postK, $postV );
+				}
 			}
 		}
 		//set capabilities
-		if( !empty($_POST['em_capabilities']) && is_array($_POST['em_capabilities']) && (!is_multisite() || is_multisite() && is_super_admin()) ){
+		if( !empty($_POST['em_capabilities']) && is_array($_POST['em_capabilities']) && (!is_multisite() || is_multisite() && em_wp_is_super_admin()) ){
 			global $em_capabilities_array, $wp_roles;
 			if( is_multisite() && is_network_admin() && $_POST['dbem_ms_global_caps'] == 1 ){
 			    //apply_caps_to_blog
@@ -67,7 +77,13 @@ function em_options_save(){
 		update_option('dbem_flush_needed',1);
 		do_action('em_options_save');
 		$EM_Notices->add_confirm('<strong>'.__('Changes saved.', 'events-manager').'</strong>', true);
-		wp_redirect(em_wp_get_referer());
+		$referrer = em_wp_get_referer();
+		//add tab hash path to url if supplied
+		if( !empty($_REQUEST['tab_path']) ){
+			$referrer_array = explode('#', $referrer);
+			$referrer = esc_url_raw($referrer_array[0] . '#' . $_REQUEST['tab_path']);
+		}
+		wp_redirect($referrer);
 		exit();
 	}
 	//Migration
@@ -84,7 +100,7 @@ function em_options_save(){
 		delete_option('dbem_migrate_images');
 	}
 	//Uninstall
-	if( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'uninstall' && current_user_can('activate_plugins') && !empty($_REQUEST['confirmed']) && check_admin_referer('em_uninstall_'.get_current_user_id().'_wpnonce') && is_super_admin() ){
+	if( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'uninstall' && current_user_can('activate_plugins') && !empty($_REQUEST['confirmed']) && check_admin_referer('em_uninstall_'.get_current_user_id().'_wpnonce') && em_wp_is_super_admin() ){
 		if( check_admin_referer('em_uninstall_'.get_current_user_id().'_confirmed','_wpnonce2') ){
 			//We have a go to uninstall
 			global $wpdb;
@@ -112,7 +128,6 @@ function em_options_save(){
 			$wpdb->query('DROP TABLE '.EM_TICKETS_TABLE);
 			$wpdb->query('DROP TABLE '.EM_TICKETS_BOOKINGS_TABLE);
 			$wpdb->query('DROP TABLE '.EM_RECURRENCE_TABLE);
-			$wpdb->query('DROP TABLE '.EM_CATEGORIES_TABLE);
 			$wpdb->query('DROP TABLE '.EM_META_TABLE);
 			
 			//delete options
@@ -124,7 +139,7 @@ function em_options_save(){
 		}
 	}
 	//Reset
-	if( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'reset' && !empty($_REQUEST['confirmed']) && check_admin_referer('em_reset_'.get_current_user_id().'_wpnonce') && is_super_admin() ){
+	if( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'reset' && !empty($_REQUEST['confirmed']) && check_admin_referer('em_reset_'.get_current_user_id().'_wpnonce') && em_wp_is_super_admin() ){
 		if( check_admin_referer('em_reset_'.get_current_user_id().'_confirmed','_wpnonce2') ){
 			//We have a go to uninstall
 			global $wpdb;
@@ -139,12 +154,37 @@ function em_options_save(){
 			}
 			//go back to plugin options page
 			$EM_Notices->add_confirm(__('Settings have been reset back to default. Your events, locations and categories have not been modified.','events-manager'), true);
-			wp_redirect(EM_ADMIN_URL.'&page=events-manager-options');
+			wp_redirect(em_wp_get_referer());
 			exit();
 		}
 	}
+	//Cleanup Event Orphans
+	if( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'cleanup_event_orphans' && check_admin_referer('em_cleanup_event_orphans_'.get_current_user_id().'_wpnonce') && em_wp_is_super_admin() ){
+		//Firstly, get all orphans
+		global $wpdb;
+		$sql = 'SELECT event_id FROM '.EM_EVENTS_TABLE.' WHERE post_id NOT IN (SELECT ID FROM ' .$wpdb->posts. ' WHERE post_type="'. EM_POST_TYPE_EVENT .'" OR post_type="event-recurring")';
+		if( EM_MS_GLOBAL ){
+			if( is_main_site() ){
+				$sql .= $wpdb->prepare(' AND (blog_id=%d or blog_id IS NULL)', get_current_blog_id());
+			}else{
+				$sql .= $wpdb->prepare(' AND blog_id=%d', get_current_blog_id());
+			}
+		}
+		$results = $wpdb->get_col($sql);
+		$deleted_events = 0;
+		foreach( $results as $event_id ){
+			$EM_Event = new EM_Event($event_id);
+			if( !empty($EM_Event->orphaned_event) && $EM_Event->delete() ){
+				$deleted_events++;
+			}
+		}
+		//go back to plugin options page
+		$EM_Notices->add_confirm(sprintf(__('Found %d orphaned events, deleted %d successfully','events-manager'), count($results), $deleted_events), true);
+		wp_redirect(em_wp_get_referer());
+		exit();
+	}
 	//Force Update Recheck - Workaround for now
-	if( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'recheck_updates' && check_admin_referer('em_recheck_updates_'.get_current_user_id().'_wpnonce') && is_super_admin() ){
+	if( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'recheck_updates' && check_admin_referer('em_recheck_updates_'.get_current_user_id().'_wpnonce') && em_wp_is_super_admin() ){
 		//force recheck of plugin updates, to refresh dl links
 		delete_transient('update_plugins');
 		delete_site_transient('update_plugins');
@@ -153,7 +193,7 @@ function em_options_save(){
 		exit();
 	}
 	//Flag version checking to look at trunk, not tag
-	if( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'check_devs' && check_admin_referer('em_check_devs_wpnonce') && is_super_admin() ){
+	if( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'check_devs' && check_admin_referer('em_check_devs_wpnonce') && em_wp_is_super_admin() ){
 		//delete transients, and add a flag to recheck dev version next time round
 		delete_transient('update_plugins');
 		delete_site_transient('update_plugins');
@@ -162,7 +202,139 @@ function em_options_save(){
 		wp_redirect(em_wp_get_referer());
 		exit();
 	}
+	//import EM settings
+	if( !empty($_REQUEST['action']) && ( ($_REQUEST['action'] == 'import_em_settings' && check_admin_referer('import_em_settings')) || (is_multisite() && $_REQUEST['action'] == 'import_em_ms_settings' && check_admin_referer('import_em_ms_settings')) ) && em_wp_is_super_admin() ){
+		//upload uniquely named file to system for usage later
+		if( !empty($_FILES['import_settings_file']['size']) && is_uploaded_file($_FILES['import_settings_file']['tmp_name']) ){
+			$settings = file_get_contents($_FILES['import_settings_file']['tmp_name']);
+			$settings = json_decode($settings, true);
+			if( is_array($settings) ){
+				if( is_multisite() && $_REQUEST['action'] == 'import_em_ms_settings' ){
+					global $EM_MS_Globals, $wpdb;
+					$sitewide_options = $EM_MS_Globals->get_globals();
+					foreach( $settings as $k => $v ){
+						if( in_array($k, $sitewide_options) ) update_site_option($k, $v);
+					}
+				}else{
+					foreach( $settings as $k => $v ){
+						if( preg_match('/^(?:db)emp?_/', $k) ){
+							update_option($k, $v);
+						}
+					}
+				}
+				$EM_Notices->add_confirm(__('Settings imported.','events-manager'), true);
+				wp_redirect(em_wp_get_referer());
+				exit();
+			}
+		}
+		$EM_Notices->add_error(__('Please upload a valid txt file containing Events Manager import settings.','events-manager'), true);
+		wp_redirect(em_wp_get_referer());
+		exit();
+	}
+	//export EM settings
+	if( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'export_em_settings' && check_admin_referer('export_em_settings') && em_wp_is_super_admin() ){
+		global $wpdb;
+		$results = $wpdb->get_results('SELECT option_name, option_value FROM '.$wpdb->options ." WHERE option_name LIKE 'dbem_%' OR option_name LIKE 'emp_%' OR option_name LIKE 'em_%'", ARRAY_A);
+		$options = array();
+		foreach( $results as $result ) $options[$result['option_name']] = $result['option_value'];
+		header('Content-Type: text/plain; charset=utf-8');
+		header('Content-Disposition: attachment; filename="events-manager-settings.txt"');
+		echo json_encode($options);
+		exit();
+	}elseif( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'export_em_ms_settings' && check_admin_referer('export_em_ms_settings') && is_multisite() && em_wp_is_super_admin() ){
+		//delete transients, and add a flag to recheck dev version next time round
+		global $EM_MS_Globals, $wpdb;
+		$options = array();
+		$sitewide_options = $EM_MS_Globals->get_globals();
+		foreach( $sitewide_options as $option ) $options[$option] = get_site_option($option);
+		header('Content-Type: text/plain; charset=utf-8');
+		header('Content-Disposition: attachment; filename="events-manager-settings.txt"');
+		echo json_encode($options);
+		exit();
+	}
 	
+	//reset timezones
+	if( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'reset_timezones' && check_admin_referer('reset_timezones') && em_wp_is_super_admin() ){
+		include(EM_DIR.'/em-install.php');
+		if( empty($_REQUEST['timezone_reset_value']) ) return;
+		$timezone = str_replace('UTC ', '', $_REQUEST['timezone_reset_value']);
+		if( is_multisite() ){
+			if( !empty($_REQUEST['timezone_reset_blog']) && is_numeric($_REQUEST['timezone_reset_blog']) ){
+				$blog_id = $_REQUEST['timezone_reset_blog'];
+				switch_to_blog($blog_id);
+				if( $timezone == 'default' ){
+					$timezone = str_replace(' ', EM_DateTimeZone::create()->getName());
+				}
+				$blog_name = get_bloginfo('name');
+				$result = em_migrate_datetime_timezones(true, true, $timezone);
+				restore_current_blog();
+			}elseif( !empty($_REQUEST['timezone_reset_blog']) && ($_REQUEST['timezone_reset_blog'] == 'all' || $_REQUEST['timezone_reset_blog'] == 'all-resume') ){
+				global $wpdb, $current_site;
+				$blog_ids = $blog_ids_progress = get_site_option('dbem_reset_timezone_multisite_progress', false);
+				if( !is_array($blog_ids) || $_REQUEST['timezone_reset_blog'] == 'all' ){
+					$blog_ids = $blog_ids_progress = $wpdb->get_col('SELECT blog_id FROM '.$wpdb->blogs.' WHERE site_id='.$current_site->id);
+					update_site_option('dbem_reset_timezone_multisite_progress', $blog_ids_progress);
+				}
+				foreach($blog_ids as $k => $blog_id){
+					$result = true;
+					$plugin_basename = plugin_basename(dirname(dirname(__FILE__)).'/events-manager.php');
+					if( in_array( $plugin_basename, (array) get_blog_option($blog_id, 'active_plugins', array() ) ) || is_plugin_active_for_network($plugin_basename) ){
+						switch_to_blog($blog_id);
+						$blog_timezone = $timezone == 'default' ? str_replace(' ', '', EM_DateTimeZone::create()->getName()) : $timezone;
+						$blog_name = get_bloginfo('name');
+						$blog_result = em_migrate_datetime_timezones(true, true, $blog_timezone);
+						if( !$blog_result ){
+							$fails[$blog_id] = $blog_name;
+						}else{
+							unset($blog_ids_progress[$k]);
+							update_site_option('dbem_reset_timezone_multisite_progress', $blog_ids_progress);
+						}
+					}
+				}
+				if( !empty($fails) ){
+					$result = __('The following blog timezones could not be successfully reset:', 'events-manager');
+					$result .= '<ul>';
+					foreach( $fails as $fail ) $result .= '<li>'.$fail.'</li>';
+					$result .= '</ul>';
+				}else{
+					delete_site_option('dbem_reset_timezone_multisite_progress');
+					EM_Admin_Notices::remove('date_time_migration_5.9_multisite', true);
+				}
+				restore_current_blog();
+			}else{
+				$result = __('A valid blog ID must be provided, you can only reset one blog at a time.','events-manager');
+			}
+		}else{
+			$result = em_migrate_datetime_timezones(true, true, $timezone);
+		}
+		if( $result !== true ){
+			$EM_Notices->add_error($result, true);
+		}else{
+			if( is_multisite() ){
+				if( $_REQUEST['timezone_reset_blog'] == 'all' || $_REQUEST['timezone_reset_blog'] == 'all-resume' ){
+					$EM_Notices->add_confirm(sprintf(__('Event timezones on all blogs have been reset to %s.','events-manager'), '<code>'.$timezone.'</code>'), true);
+				}else{
+					$EM_Notices->add_confirm(sprintf(__('Event timezones for blog %s have been reset to %s.','events-manager'), '<code>'.$blog_name.'</code>', '<code>'.$timezone.'</code>'), true);
+				}
+			}else{
+				$EM_Notices->add_confirm(sprintf(__('Event timezones have been reset to %s.','events-manager'), '<code>'.$timezone.'</code>'), true);
+			}
+		}
+		wp_redirect(em_wp_get_referer());
+		exit();
+	}
+	
+	//update scripts that may need to run
+	$blog_updates = is_multisite() ? array_merge(EM_Options::get('updates'), EM_Options::site_get('updates')) : EM_Options::get('updates');
+	if( is_array($blog_updates) ) {
+		foreach ( $blog_updates as $update => $update_data ) {
+			$filename = EM_DIR . '/admin/settings/updates/' . $update . '.php';
+			if ( file_exists( $filename ) ) {
+				include_once( $filename );
+			}
+			do_action( 'em_admin_update_' . $update, $update_data );
+		}
+	}
 }
 add_action('admin_init', 'em_options_save');
 
@@ -209,7 +381,7 @@ function em_admin_email_test_ajax(){
 add_action('wp_ajax_em_admin_test_email','em_admin_email_test_ajax');
 
 function em_admin_options_reset_page(){
-	if( check_admin_referer('em_reset_'.get_current_user_id().'_wpnonce') && is_super_admin() ){
+	if( check_admin_referer('em_reset_'.get_current_user_id().'_wpnonce') && em_wp_is_super_admin() ){
 		?>
 		<div class="wrap">		
 			<div id='icon-options-general' class='icon32'><br /></div>
@@ -225,7 +397,7 @@ function em_admin_options_reset_page(){
 	}
 }
 function em_admin_options_uninstall_page(){
-	if( check_admin_referer('em_uninstall_'.get_current_user_id().'_wpnonce') && is_super_admin() ){
+	if( check_admin_referer('em_uninstall_'.get_current_user_id().'_wpnonce') && em_wp_is_super_admin() ){
 		?>
 		<div class="wrap">		
 			<div id='icon-options-general' class='icon32'><br /></div>
@@ -253,6 +425,10 @@ function em_admin_options_page() {
 		em_admin_options_reset_page();
 		return;
 	}
+	if( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'update' && !empty($_REQUEST['update_action']) ){
+		do_action('em_admin_update_settings_confirm_'.$_REQUEST['update_action']);
+		return;
+	}
 	//substitute dropdowns with input boxes for some situations to improve speed, e.g. if there 1000s of locations or users
 	$total_users = $wpdb->get_var("SELECT COUNT(ID) FROM {$wpdb->users};");
 	if( $total_users > 100 && !defined('EM_OPTIMIZE_SETTINGS_PAGE_USERS') ){ define('EM_OPTIMIZE_SETTINGS_PAGE_USERS',true); }
@@ -270,7 +446,7 @@ function em_admin_options_page() {
 	$bookings_placeholder_tip = " ". sprintf(__('This accepts %s, %s and %s placeholders.','events-manager'), $bookings_placeholders, $events_placeholders, $locations_placeholders);
 	
 	global $save_button;
-	$save_button = '<tr><th>&nbsp;</th><td><p class="submit" style="margin:0px; padding:0px; text-align:right;"><input type="submit" class="button-primary" id="dbem_options_submit" name="Submit" value="'. __( 'Save Changes', 'events-manager') .' ('. __('All','events-manager') .')" /></p></ts></td></tr>';
+	$save_button = '<tr><th>&nbsp;</th><td><p class="submit" style="margin:0px; padding:0px; text-align:right;"><input type="submit" class="button-primary" name="Submit" value="'. __( 'Save Changes', 'events-manager') .' ('. __('All','events-manager') .')" /></p></td></tr>';
 	
 	if( defined('EM_SETTINGS_TABS') && EM_SETTINGS_TABS ){
 	    $tabs_enabled = true;
@@ -295,6 +471,14 @@ function em_admin_options_page() {
 			<a href="<?php echo $bookings_tab_link; ?>#bookings" id="em-menu-bookings" class="nav-tab"><?php _e('Bookings','events-manager'); ?></a>
 			<?php endif; ?>
 			<a href="<?php echo $emails_tab_link; ?>#emails" id="em-menu-emails" class="nav-tab"><?php _e('Emails','events-manager'); ?></a>
+			<?php
+			$custom_tabs = apply_filters('em_options_page_tabs', array());
+			foreach( $custom_tabs as $tab_key => $tab_name ){
+				$tab_link = !empty($tabs_enabled) ? esc_url(add_query_arg( array('em_tab'=>$tab_key))) : '';
+				$active_class = !empty($tabs_enabled) && !empty($_GET['em_tab']) && $_GET['em_tab'] == $tab_key ? 'nav-tab-active':'';
+				echo "<a href='$tab_link#$tab_key' id='em-menu-$tab_key' class='nav-tab $active_class'>$tab_name</a>";
+			}
+			?>
 		</h2>
 		<form id="em-options-form" method="post" action="">
 			<div class="metabox-holder">         
@@ -313,6 +497,13 @@ function em_admin_options_page() {
         			    include('settings/tabs/bookings.php');
         			}
         			if( $_REQUEST['em_tab'] == 'emails' ) include('settings/tabs/emails.php');
+					if( array_key_exists($_REQUEST['em_tab'], $custom_tabs) ){
+						?>
+						<div class="em-menu-<?php echo esc_attr($_REQUEST['em_tab']) ?> em-menu-group">
+						<?php do_action('em_options_page_tab_'. $_REQUEST['em_tab']); ?>
+						</div>
+						<?php
+					}
 			    }
 			}else{
     			include('settings/tabs/general.php');
@@ -322,6 +513,13 @@ function em_admin_options_page() {
     			    include('settings/tabs/bookings.php');
     			}
     			include('settings/tabs/emails.php');
+				foreach( $custom_tabs as $tab_key => $tab_name ){
+					?>
+					<div class="em-menu-<?php echo esc_attr($tab_key) ?> em-menu-group" style="display:none;">
+						<?php do_action('em_options_page_tab_'. $tab_key); ?>
+					</div>
+					<?php
+				}
 			}
 			?>
 			
@@ -340,7 +538,7 @@ function em_admin_options_page() {
 			*/ ?>
 
 			<p class="submit">
-				<input type="submit" id="dbem_options_submit" class="button-primary" name="Submit" value="<?php esc_attr_e( 'Save Changes', 'events-manager'); ?>" />
+				<input type="submit" class="button-primary" name="Submit" value="<?php esc_attr_e( 'Save Changes', 'events-manager'); ?>" />
 				<input type="hidden" name="em-submitted" value="1" />
 				<input type="hidden" name="_wpnonce" value="<?php echo wp_create_nonce('events-manager-options'); ?>" />
 			</p>  
@@ -392,7 +590,7 @@ function em_admin_option_box_email(){
 		<p class="em-email-settings-check em-boxheader">
 			<em><?php _e('Before you save your changes, you can quickly send yourself a test email by clicking this button.','events-manager'); ?>
 			<?php echo sprintf(__('A test email will be sent to your account email - %s','events-manager'), $current_user->user_email . ' <a href="'.admin_url( 'profile.php' ).'">'.__('edit','events-manager').'</a>'); ?></em><br />
-			<input type="button" id="em-admin-check-email" class="secondary-button" value="<?php esc_attr_e('Test Email Settings','events-manager'); ?>" />
+			<input type="button" id="em-admin-check-email" class="button-secondary" value="<?php esc_attr_e('Test Email Settings','events-manager'); ?>" />
 			<input type="hidden" name="_check_email_nonce" value="<?php echo wp_create_nonce('check_email'); ?>" />
 			<span id="em-email-settings-check-status"></span>
 		</p>
@@ -566,17 +764,34 @@ function em_admin_option_box_uninstall(){
 		$uninstall_url = admin_url().'network/admin.php?page=events-manager-options&amp;action=uninstall&amp;_wpnonce='.wp_create_nonce('em_uninstall_'.get_current_user_id().'_wpnonce');
 		$reset_url = admin_url().'network/admin.php?page=events-manager-options&amp;action=reset&amp;_wpnonce='.wp_create_nonce('em_reset_'.get_current_user_id().'_wpnonce');
 		$recheck_updates_url = admin_url().'network/admin.php?page=events-manager-options&amp;action=recheck_updates&amp;_wpnonce='.wp_create_nonce('em_recheck_updates_'.get_current_user_id().'_wpnonce');
+		$cleanup_event_orphans_url = admin_url().'network/admin.php?page=events-manager-options&amp;action=cleanup_event_orphans&amp;_wpnonce='.wp_create_nonce('em_cleanup_event_orphans_'.get_current_user_id().'_wpnonce');
 		$check_devs = admin_url().'network/admin.php?page=events-manager-options&amp;action=check_devs&amp;_wpnonce='.wp_create_nonce('em_check_devs_wpnonce');
+		$export_settings_url = admin_url().'network/admin.php?page=events-manager-options&amp;action=export_em_ms_settings&amp;_wpnonce='.wp_create_nonce('export_em_ms_settings');
+		$import_nonce = wp_create_nonce('import_em_ms_settings');
 	}else{
 		$uninstall_url = EM_ADMIN_URL.'&amp;page=events-manager-options&amp;action=uninstall&amp;_wpnonce='.wp_create_nonce('em_uninstall_'.get_current_user_id().'_wpnonce');
 		$reset_url = EM_ADMIN_URL.'&amp;page=events-manager-options&amp;action=reset&amp;_wpnonce='.wp_create_nonce('em_reset_'.get_current_user_id().'_wpnonce');
 		$recheck_updates_url = EM_ADMIN_URL.'&amp;page=events-manager-options&amp;action=recheck_updates&amp;_wpnonce='.wp_create_nonce('em_recheck_updates_'.get_current_user_id().'_wpnonce');
+		$cleanup_event_orphans_url= EM_ADMIN_URL.'&amp;page=events-manager-options&amp;action=cleanup_event_orphans&amp;_wpnonce='.wp_create_nonce('em_cleanup_event_orphans_'.get_current_user_id().'_wpnonce');
 		$check_devs = EM_ADMIN_URL.'&amp;page=events-manager-options&amp;action=check_devs&amp;_wpnonce='.wp_create_nonce('em_check_devs_wpnonce');
+		$export_settings_url = EM_ADMIN_URL.'&amp;page=events-manager-options&amp;action=export_em_settings&amp;_wpnonce='.wp_create_nonce('export_em_settings');
+		$import_nonce = wp_create_nonce('import_em_settings');
 	}
+	$reset_timezone_nonce = wp_create_nonce('reset_timezones');
+	$options_data = get_option('dbem_data');  
 	?>
 	<div  class="postbox" id="em-opt-admin-tools" >
 		<div class="handlediv" title="<?php __('Click to toggle', 'events-manager'); ?>"><br /></div><h3><span><?php _e ( 'Admin Tools', 'events-manager'); ?> (<?php _e ( 'Advanced', 'events-manager'); ?>)</span></h3>
 		<div class="inside">
+			
+			<?php
+			//update scripts that may need to run
+			$blog_updates = is_multisite() ? array_merge(EM_Options::get('updates'), EM_Options::site_get('updates')) : EM_Options::get('updates');
+			foreach( $blog_updates as $update => $update_data ){
+				do_action('em_admin_update_settings_'.$update, $update_data);
+			}
+			?>
+			
 			<table class="form-table">
     		    <tr class="em-header"><td colspan="2">
         			<h4><?php _e ( 'Development Versions &amp; Updates', 'events-manager'); ?></h4>
@@ -595,6 +810,138 @@ function em_admin_option_box_uninstall(){
 			
 			<table class="form-table">
     		    <tr class="em-header"><td colspan="2">
+        			<h4><?php esc_html_e( 'Import/Export Settings', 'events-manager'); ?></h4>
+        			<?php if( is_multisite() && is_network_admin() ): ?>
+        			<p><?php esc_html_e("Within the network admin area, only network-specific settings will be exported or imported. For individual site settings please visit the relevant site within your network.", 'events-manager'); ?></p>
+        			<?php endif; ?>
+    			</td></tr>
+				<tr>
+    			    <th style="text-align:right;">
+    			    	<a href="#" class="button-secondary" id="em-admin-import-settings"><?php esc_html_e('Import Settings','events-manager'); ?></a>
+    			    </th>
+    			    <td>
+    			    	<input type="file" name="import_settings_file" id="em-admin-import-settings-file" />
+    			    	<p><em><?php echo esc_html(sprintf(__('Choose a settings file saved from a backup or another Events Manager installation and click the \'%s\' button.','events-manager'), __('Import Settings','events-manager'))); ?></em></p>
+    			    </td>
+					<script type="text/javascript" charset="utf-8">
+						jQuery(document).ready(function($){
+							$('a#em-admin-import-settings').click(function(e,el){
+								var thisform = $(this).closest('form');
+								thisform.find('input[type=text], textarea, select, input[type=radio], input[type=hidden]').prop('disabled', true);
+								thisform.find('input[name=_wpnonce]').val('<?php echo esc_attr($import_nonce); ?>').prop('disabled', false);
+								thisform.append($('<input type="hidden" name="action" value="<?php echo is_multisite() ? 'import_em_ms_settings':'import_em_settings'; ?>" />'));
+								thisform.attr('enctype', 'multipart/form-data').submit();
+							});
+						});
+					</script>
+    			</tr>
+    			<tr>
+    			    <th style="text-align:right;">
+    			    	<a href="<?php echo $export_settings_url; ?>" class="button-secondary"><?php esc_html_e('Export Settings','events-manager'); ?></a>
+    			    </th>
+    			    <td><?php esc_html_e('Export your Events Manager settings and restore them here or on another website running this plugin.','events-manager'); ?></td>
+				</tr>
+			</table>
+			
+			
+			<table class="form-table">
+    		    <tr class="em-header"><td colspan="2">
+    		        <h4><?php esc_html_e( 'Database Cleanup', 'events-manager'); ?></h4>
+    		    </td></tr>
+				<tr>
+    			    <th style="text-align:right;"><a href="<?php echo $cleanup_event_orphans_url; ?>" class="button-secondary admin-tools-db-cleanup"><?php _e('Remove Orphaned Events','events-manager'); ?></a></th>
+    			    <td>
+    			    	<?php 
+    			    		global $wpdb;
+    			    		$sql = 'SELECT count(*) FROM '.EM_EVENTS_TABLE.' WHERE post_id NOT IN (SELECT ID FROM ' .$wpdb->posts. ' WHERE post_type="'. EM_POST_TYPE_EVENT .'" OR post_type="event-recurring")';
+    			    		if( EM_MS_GLOBAL ){
+    			    			if( is_main_site() ){
+    			    				$sql .= $wpdb->prepare(' AND (blog_id=%d or blog_id IS NULL)', get_current_blog_id());
+    			    			}else{
+    			    				$sql .= $wpdb->prepare(' AND blog_id=%d', get_current_blog_id());
+    			    			}
+    			    		}
+    			    		$results = $wpdb->get_var($sql);
+    			    		echo sprintf(esc_html__('Orphaned events may show on your event lists but not point to real event pages, and can be deleted. %d potentially orphaned events have been found.', 'events-manager'), $results);
+    			    	?>
+    			    </td>
+    			</tr>
+			</table>
+			<script type="text/javascript">
+				if( typeof EM == 'object' ){ EM.admin_db_cleanup_warning = '<?php echo esc_js(__('Are you sure you want to proceed? We recommend you back up your database first, just in case!', 'events-manager')); ?>'; }
+			</script>
+			
+			<table class="form-table">
+    		    <tr class="em-header"><td colspan="2">
+    		        <h4><?php _e ( 'Reset Timezones', 'events-manager'); ?></h4>
+					<?php if( is_multisite() && get_site_option('dbem_reset_timezone_multisite_progress', false) !== false ): ?>
+					<p style="color:red;">
+						<?php 
+						echo sprintf( esc_html__('Your last attempt to reset all blogs to a certain timezone did not complete successfully. You can attempt to reset only those blogs that weren\'t completed by selecting your desired timezone again and then %s from the dropdowns below', 'events-manager'), '<code>'.esc_html__('Resume Previous Attempt (All Blogs)', 'events-manager').'</code>' ); 
+						?>
+					</p>
+					<?php endif; ?>
+				</td></tr>
+    		    <tr>
+    			    <th style="text-align:right;">
+    			    	<a href="#" class="button-secondary" id="em-reset-event-timezones"><?php esc_html_e('Reset Event Timezones','events-manager'); ?></a>
+    			    </th>
+    			    <td>
+    			    	<select name="timezone_reset_value" class="em-reset-event-timezones">
+    			    		<?php 
+    			    			if( is_multisite() ){
+    			    				$timezone_default = 'none';
+    			    				echo '<option value="default">'.__('Blog Default Timezone', 'events-manager').'</option>';
+    			    			}else{
+	    			    			$timezone_default = str_replace(' ', '', EM_DateTimeZone::create()->getName());
+								}
+							?>
+    			    		<?php echo wp_timezone_choice($timezone_default); ?>
+    			    	</select>
+    			    	<?php if( is_multisite() ): ?>
+    			    		<select name="timezone_reset_blog" class="em-reset-event-timezones">
+    			    			<option value="0"><?php esc_html_e('Select a blog...', 'events-manager'); ?></option>
+    			    			<option value="all"><?php esc_html_e('All Blogs', 'events-manager'); ?></option>
+    			    			<?php if( is_multisite() && get_site_option('dbem_reset_timezone_multisite_progress', false) !== false ): ?>
+    			    			<option value="all-resume"><?php esc_html_e('Resume Previous Attempt (All Blogs)', 'events-manager'); ?></option>
+    			    			<?php endif; ?>
+    			    			<?php
+	    			    		foreach( get_sites() as $WP_Site){ /* @var WP_Site $WP_Site */
+	    			    			echo '<option value="'.esc_attr($WP_Site->blog_id).'">'. esc_html($WP_Site->blogname) .'</option>';
+	    			    		}
+	    			    		?>
+    			    		</select>
+    			    	<?php endif; ?>
+	    		        <p>
+	    		        	<em><?php esc_html_e('Select a Timezone to reset all your blog events to.','events-manager'); ?></em><br />
+	    		        	<em><strong><?php esc_html_e('WARNING! This cannot be undone and will overwrite all event timezones, you may want to back up your database first!','events-manager'); ?></strong></em>
+	    		        </p>
+    			    </td>
+					<script type="text/javascript" charset="utf-8">
+						jQuery(document).ready(function($){
+							$('select[name="timezone_reset_value"]').change( function( e ){
+								if( $(this).val() == '' ){
+									$('a#em-reset-event-timezones').css({opacity:0.5, cursor:'default'});
+								}else{
+									$('a#em-reset-event-timezones').css({opacity:1, cursor:'pointer'});
+								}
+							}).trigger('change');
+							$('a#em-reset-event-timezones').click(function(e,el){
+								if( $('select[name="timezone_reset_value"]').val() == '' ) return false;
+								var thisform = $(this).closest('form');
+								thisform.find('input, textarea, select').prop('disabled', true);
+								thisform.find('select.em-reset-event-timezones').prop('disabled', false);
+								thisform.find('input[name=_wpnonce]').val('<?php echo esc_attr($reset_timezone_nonce); ?>').prop('disabled', false);
+								thisform.append($('<input type="hidden" name="action" value="<?php echo is_multisite() ? 'reset_timezones':'reset_timezones'; ?>" />'));
+								thisform.submit();
+							});
+						});
+					</script>
+    		    </td></tr>
+			</table>
+			
+			<table class="form-table">
+    		    <tr class="em-header"><td colspan="2">
     		        <h4><?php _e ( 'Uninstall/Reset', 'events-manager'); ?></h4>
     		        <p><?php _e('Use the buttons below to uninstall Events Manager completely from your system or reset Events Manager to original settings and keep your event data.','events-manager'); ?></p>
     		    </td></tr>
@@ -608,5 +955,76 @@ function em_admin_option_box_uninstall(){
 		</div>
 	</div>
 	<?php	
+}
+
+/**
+ * Meta options box for privacy and data protection rules for GDPR (and other dp laws) compliancy
+ */
+function em_admin_option_box_data_privacy(){
+	global $save_button;
+	$privacy_options = array(
+		0 => __('Do not include', 'events-manager'),
+		1 => __('Include all', 'events-manager'),
+		2 => __('Include only guest submissions', 'events-manager')
+	);
+	?>
+    <div  class="postbox " id="em-opt-data-privacy" >
+        <div class="handlediv" title="<?php __('Click to toggle', 'events-manager'); ?>"><br /></div><h3><span><?php _e ( 'Privacy', 'events-manager'); ?> </span></h3>
+        <div class="inside">
+            <p class="em-boxheader"><?php echo sprintf(__('Depending on the nature of your site, you will be subject to one or more national and international privacy/data protection laws such as the %s. Below are some options that you can use to tailor how Events Manager interacts with WordPress privacy tools.','events-manager'), '<a href=http://ec.europa.eu/justice/smedataprotect/index_en.htm">GDPR</a>'); ?></p>
+            <p class="em-boxheader"><?php echo sprintf(__('For more information see our <a href="%s">data privacy documentation</a>.','events-manager'), 'http://wp-events-plugin.com/documentation/data-privacy-gdpr-compliance/'); ?></p>
+            <p class="em-boxheader"><?php echo __('All options below relate to data that may have been submitted by or collected from the user requesting their personal data, which would also include events and locations where they are the author.', 'events-manager'); ?></p>
+            <table class='form-table'>
+                <thead>
+                    <tr class="em-header">
+                        <th colspan="2"><h4><?php esc_html_e('Export Personal Data'); ?></h4></th>
+                    </tr>
+                </thead>
+				<?php
+				em_options_select ( __( 'Events', 'events-manager'), 'dbem_data_privacy_export_events', $privacy_options );
+				em_options_select ( __( 'Locations', 'events-manager'), 'dbem_data_privacy_export_locations', $privacy_options, __('Locations submitted by guest users are not included, unless they are linked to events also submitted by them.', 'events-manager') );
+				em_options_select ( __( 'Bookings', 'events-manager'), 'dbem_data_privacy_export_bookings', $privacy_options, __('This is specific to bookings made by the user, not bookings that may have been made to events they own.', 'events-manager'), $privacy_options );
+				?>
+                <thead>
+                    <tr class="em-header">
+                        <th colspan="2"><h4><?php esc_html_e('Erase Personal Data'); ?></h4></th>
+                    </tr>
+                </thead>
+                <?php
+                em_options_select ( __( 'Events', 'events-manager'), 'dbem_data_privacy_erase_events', $privacy_options );
+                em_options_select ( __( 'Locations', 'events-manager'), 'dbem_data_privacy_erase_locations', $privacy_options, __('Locations submitted by guest users are not included, unless they are linked to events also submitted by them.', 'events-manager') );
+                em_options_select ( __( 'Bookings', 'events-manager'), 'dbem_data_privacy_erase_bookings', $privacy_options, __('This is specific to bookings made by the user, not bookings that may have been made to events they own.', 'events-manager'), $privacy_options );
+                ?>
+                <thead>
+                    <tr class="em-header">
+                        <th colspan="2">
+                            <h4><?php esc_html_e('Consent', 'events-manager'); ?></h4>
+                            <p><?php esc_html_e('If you collect personal data, you may want to request their consent. The options below will automatically add checkboxes requesting this consent.', 'events-manager'); ?></p>
+                        </th>
+                    </tr>
+                </thead>
+                <?php
+                $consent_options = array(
+                    0 => __('Do not show', 'events-manager'),
+                    1 => __('Show to all', 'events-manager'),
+                    2 => __('Only show to guests', 'events-manager')
+                );
+                $consent_remember = array(
+	                0 => __('Always show and ask for consent', 'events-manager'),
+                	1 => __('Remember and hide checkbox', 'events-manager'),
+	                2 => __('Remember and show checkbox', 'events-manager')
+                );
+                em_options_input_text( __('Consent Text', 'events-manager'), 'dbem_data_privacy_consent_text', __('%s will be replaced by a link to your site privacy policy page.', 'events-manager') );
+                em_options_select( __('Remembering Consent', 'events-manager'), 'dbem_data_privacy_consent_remember', $consent_remember, __('You can hide or leave the consent box checked for registered users who have provided consent previously.', 'events-manager') );
+                em_options_select( __( 'Event Submission Forms', 'events-manager'), 'dbem_data_privacy_consent_events', $privacy_options );
+                em_options_select( __( 'Location Submission Forms', 'events-manager'), 'dbem_data_privacy_consent_locations', $privacy_options );
+                em_options_select( __( 'Bookings Forms', 'events-manager'), 'dbem_data_privacy_consent_bookings', $privacy_options );
+
+                echo $save_button;
+                ?>
+            </table>
+        </div> <!-- . inside -->
+    </div> <!-- .postbox -->
+	<?php
 }
 ?>

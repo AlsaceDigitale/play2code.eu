@@ -4,8 +4,8 @@
 	 */
 	function em_ical( ){
 		//check if this is a calendar request for all events
-		if ( preg_match('/events.ics$/', $_SERVER['REQUEST_URI']) || $_SERVER['REQUEST_URI'] == '/?ical=1' ) {
-			header('Content-type: text/calendar; charset=utf-8');
+		if ( preg_match('/events.ics(\?.+)?$/', $_SERVER['REQUEST_URI']) || $_SERVER['REQUEST_URI'] == '/?ical=1' ) {
+			header('Content-Type: text/calendar; charset=utf-8');
 			header('Content-Disposition: inline; filename="events.ics"');
 			//send headers
 			em_locate_template('templates/ical.php', true);
@@ -65,4 +65,25 @@
 		}
 	}
 	add_action ( 'parse_query', 'em_ical_item' );
+	
+
+	/**
+	 * A utf-8 safe wordwrap function, avoiding CRLF issues with Chinese and other multi-byte characters.
+	 * @param string $string
+	 * @return string
+	 */
+	function em_mb_ical_wordwrap($string){
+		if( !defined('EM_MB_ICAL_WORDWRAP') || EM_MB_ICAL_WORDWRAP ){
+			$return = '';
+			for ( $i = 0; strlen($string) > 0; $i++ ) {
+				$linewidth = ($i == 0? 75 : 74);
+				$linesize = (strlen($string) > $linewidth? $linewidth: strlen($string));
+				if($i > 0) $return .= "\r\n ";
+				$return .= mb_strcut($string,0,$linesize);
+				$string = mb_strcut($string,$linewidth);
+			}
+			return $return;
+		}
+		return wordwrap($string, 75, "\r\n ", true);
+	}
 ?>

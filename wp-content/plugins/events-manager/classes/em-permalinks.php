@@ -4,12 +4,13 @@ if( !class_exists('EM_Permalinks') ){
 	class EM_Permalinks {
 		static $em_queryvars = array(
 			'event_id','event_slug', 'em_redirect',
+		    'recurrence_id',
 			'location_id','location_slug',
 			'person_id',
 			'booking_id',
 			'category_id', 'category_slug',
 			'ticket_id',
-			'calendar_day',
+			'calendar_day', 'pno',
 			'rss', 'ical','event_categories','event_locations'
 		);
 		
@@ -33,7 +34,7 @@ if( !class_exists('EM_Permalinks') ){
 		public static function flush(){
 			global $wp_rewrite;
 			$wp_rewrite->flush_rules();
-			delete_option('dbem_flush_needed');
+			update_option('dbem_flush_needed', 0);
 		}
 		
 		public static function post_type_archive_link($link, $post_type){
@@ -135,6 +136,7 @@ if( !class_exists('EM_Permalinks') ){
 			}else{
 				$events_slug = EM_POST_TYPE_EVENT_SLUG;
 				$em_rules[$events_slug.'/(\d{4}-\d{2}-\d{2})$'] = 'index.php?post_type='.EM_POST_TYPE_EVENT.'&calendar_day=$matches[1]'; //event calendar date search
+				$em_rules[$events_slug.'/(\d{4}-\d{2}-\d{2})/page/?([0-9]{1,})/?$'] = 'index.php?post_type='.EM_POST_TYPE_EVENT.'&calendar_day=$matches[1]&paged=$matches[2]'; //event calendar date search paged
 				if( get_option('dbem_rsvp_enabled') ){
 					if( !get_option( 'dbem_my_bookings_page') || !is_object(get_post(get_option( 'dbem_my_bookings_page'))) ){ //only added if bookings page isn't assigned
 						$em_rules[$events_slug.'/my\-bookings$'] = 'index.php?post_type='.EM_POST_TYPE_EVENT.'&bookings_page=1'; //page for users to manage bookings
@@ -207,12 +209,13 @@ if( !class_exists('EM_Permalinks') ){
 			$taxonomies = EM_Object::get_taxonomies();
 			foreach($taxonomies as $tax_arg => $taxonomy_info){
 				//set the dynamic rule for this taxonomy
-				$em_rules[$taxonomy_info['slug']."/([^/]+)/ical/?$"] = 'index.php?'.$taxonomy_info['query_var'].'=$matches[1]&ical=1';
+				$em_rules[$taxonomy_info['slug']."/(.+)/ical/?$"] = 'index.php?'.$taxonomy_info['query_var'].'=$matches[1]&ical=1';
 			}
 			//add RSS location CPT endpoint
 			if( get_option('dbem_locations_enabled') ){
 				$em_rules[EM_POST_TYPE_LOCATION_SLUG."/([^/]+)/rss/?$"] = 'index.php?'.EM_POST_TYPE_LOCATION.'=$matches[1]&rss=1';
 			}
+			$em_rules = apply_filters('em_rewrite_rules_array', $em_rules);
 			return $em_rules + $rules;
 		}
 		
@@ -287,6 +290,7 @@ if( !class_exists('EM_Permalinks') ){
  */
 function em_get_my_bookings_url(){
 	global $bp, $wp_rewrite;
+	// @todo add filter for bookings url, remove bp condition and add it to bp-em-core.php
 	if( !empty($bp->events->link) ){
 		//get member url
 		return $bp->events->link.'attending/';
@@ -299,4 +303,18 @@ function em_get_my_bookings_url(){
 			return preg_match('/\?/',EM_URI) ? EM_URI.'&bookings_page=1':EM_URI.'?bookings_page=1';
 		}
 	}
+}
+
+/**
+ * Gets the admin URL for editing events. If called from front-end and there's a front-end edit events page, that will be
+ * returned, otherwise a url to the dashboard will be returned.
+ */
+function em_get_events_admin_url(){
+    $admin_url = admin_url('edit.php?post_type=event');
+    if( !is_admin() ){
+        if( get_option('dbem_edit_events_page') ){
+            $admin_url = get_permalink(get_option( 'dbem_edit_events_page' ));
+        }
+    }
+    return apply_filters('em_get_events_admin_url', $admin_url);
 }

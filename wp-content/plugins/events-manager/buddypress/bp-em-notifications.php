@@ -54,10 +54,8 @@ function bp_em_format_notifications( $action, $item_id, $secondary_item_id, $tot
  */
 function bp_em_remove_screen_notifications() {
 	global $bp;
-	if( function_exists('bp_notifications_delete_notifications_by_type') ){ //backwards compat for BP 1.9
+	if( function_exists('bp_notifications_delete_notifications_by_type') ){
 	    bp_notifications_delete_notifications_by_type( $bp->loggedin_user->id, $bp->events->slug, 'attending' );
-	}else{
-	    bp_core_delete_notifications_by_type( $bp->loggedin_user->id, $bp->events->slug, 'attending' );
 	}
 }
 add_action( 'bp_em_my_events', 'bp_em_remove_screen_notifications' );
@@ -79,7 +77,7 @@ function bp_em_add_booking_notification($result, $EM_Booking){
 	}elseif( $EM_Booking->get_status() == 3 ){
 		$action = 'cancelled_booking';
 	}
-	if( !empty($action) && !(get_option('dbem_bookings_registration_disable') && get_option('dbem_bookings_registration_user') == $EM_Booking->get_event()->get_contact()->ID) ){
+	if( !empty($action) && !$EM_Booking->is_no_user() ){
 	    bp_notifications_add_notification( array(
 	        'item_id' => $EM_Booking->booking_id,
 	        'secondary_item_id' => $EM_Booking->event_id,

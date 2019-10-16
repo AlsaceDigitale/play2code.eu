@@ -58,7 +58,24 @@ class EM_Booking extends EM_Object{
 	 * @var array
 	 */
 	var $notes;
-	var $timestamp;
+	/**
+	 * Deprecated as of 5.8.2, previously used to store timestamp of booking date. Use EM_Booking->date()->getTimestamp() instead.
+	 * @var int
+	 */
+	private $timestamp;
+	/**
+	 * The date of the booking, in UTC time, represented as a DATETIME mysql value.
+	 * @var string
+	 */
+	protected $booking_date;
+	/**
+	 * Contains the booking date in EM_DateTime object form.
+	 * @var EM_DateTime
+	 */
+	protected $date;
+	/**
+	 * @var EM_Person
+	 */
 	var $person;
 	var $required_fields = array('booking_id', 'event_id', 'person_id', 'booking_spaces');
 	var $feedback_message = "";
@@ -102,7 +119,7 @@ class EM_Booking extends EM_Object{
 	var $manage_override;
 	
 	/**
-	 * Creates booking object and retreives booking data (default is a blank booking object). Accepts either array of booking data (from db) or a booking id.
+	 * Creates booking object and retrieves booking data (default is a blank booking object). Accepts either array of booking data (from db) or a booking id.
 	 * @param mixed $booking_data
 	 * @return null
 	 */
@@ -115,7 +132,7 @@ class EM_Booking extends EM_Object{
 			if( is_array($booking_data) ){
 				$booking = $booking_data;
 			}elseif( is_numeric($booking_data) ){
-				//Retreiving from the database
+				//Retrieving from the database
 				$sql = "SELECT * FROM ". EM_BOOKINGS_TABLE ." WHERE booking_id ='$booking_data'";
 				$booking = $wpdb->get_row($sql, ARRAY_A);
 			}
@@ -125,7 +142,7 @@ class EM_Booking extends EM_Object{
 			$this->to_object($booking);
 			$this->previous_status = $this->booking_status;
 			$this->get_person();
-			$this->timestamp = !empty($booking['booking_date']) ? strtotime($booking['booking_date'], current_time('timestamp')):false;
+			$this->booking_date = !empty($booking['booking_date']) ? $booking['booking_date']:false;
 		}
 		//Do it here so things appear in the po file.
 		$this->status_array = array(
@@ -140,10 +157,33 @@ class EM_Booking extends EM_Object{
 		//do some legacy checking here for bookings made prior to 5.4, due to how taxes are calculated
 		$this->get_tax_rate();
 		if( !empty($this->legacy_tax_rate) ){
-			//reset booking_price, it'll be recalculated later (if you're using this property directly, don't, use $this->get_price())
+			//reset booking_price, it'll be recalculated later (if you're using this property directly, don't use $this->get_price())
 	    	$this->booking_price = $this->booking_taxes = null;
 		}
 		do_action('em_booking', $this, $booking_data);
+	}
+
+	
+	function __get( $var ){
+	    //get the modified or created date from the DB only if requested, and save to object
+	    if( $var == 'timestamp' ){
+	    	if( $this->date() === false ) return 0;
+	    	return $this->date()->getTimestampWithOffset();
+	    }
+	    return null;
+	}
+	
+	public function __set( $prop, $val ){
+		if( $prop == 'timestamp' ){
+			if( $this->date() !== false );
+			$this->date()->setTimestamp($val);
+		}else{
+			$this->$prop = $val;
+		}
+	}
+	
+	public function __isset( $prop ){
+		if( $prop == 'timestamp' ) return $this->date()->getTimestamp() > 0;
 	}
 	
 	function get_notes(){
@@ -162,7 +202,7 @@ class EM_Booking extends EM_Object{
 	
 	/**
 	 * Saves the booking into the database, whether a new or existing booking
-	 * @param $mail whether or not to email the user and contact people
+	 * @param bool $mail whether or not to email the user and contact people
 	 * @return boolean
 	 */
 	function save($mail = true){
@@ -187,7 +227,7 @@ class EM_Booking extends EM_Object{
 			}else{
 				$update = false;
 				$data_types = $this->get_types($data);
-				$data['booking_date'] = current_time('mysql');
+				$data['booking_date'] = $this->booking_date = gmdate('Y-m-d H:i:s');
 				$data_types[] = '%s';
 				$result = $wpdb->insert($table, $data, $data_types);
 			    $this->booking_id = $wpdb->insert_id;  
@@ -224,7 +264,7 @@ class EM_Booking extends EM_Object{
 	}
 	
 	/**
-	 * Load an record into this object by passing an associative array of table criterie to search for. 
+	 * Load an record into this object by passing an associative array of table criteria to search for. 
 	 * Returns boolean depending on whether a record is found or not. 
 	 * @param $search
 	 * @return boolean
@@ -285,7 +325,7 @@ class EM_Booking extends EM_Object{
 			//get person
 			$this->get_person();
 			//re-run compatiblity keys function
-			$this->compat_keys(); //depricating in 6.0
+			$this->compat_keys(); //depracating in 6.0
 		}
 		return apply_filters('em_booking_get_post',count($this->errors) == 0,$this);
 	}
@@ -329,9 +369,9 @@ class EM_Booking extends EM_Object{
 	}
 	
 	/**
-	 * Get the total number of spaces booked in THIS booking. Seting $force_refresh to true will recheck spaces, even if previously done so.
-	 * @param unknown_type $force_refresh
-	 * @return mixed
+	 * Get the total number of spaces booked in THIS booking. Setting $force_refresh to true will recheck spaces, even if previously done so.
+	 * @param boolean $force_refresh
+	 * @return int
 	 */
 	function get_spaces( $force_refresh=false ){
 		if($this->booking_spaces == 0 || $force_refresh == true ){
@@ -353,6 +393,7 @@ class EM_Booking extends EM_Object{
 	    //recalculate price here only if price is not actually set
 		if( $this->booking_price === null ){
 		    $this->calculate_price();
+		    /* Deprecated filter - Equivalent of em_booking_calculate_price, please use that instead */
 			$this->booking_price = apply_filters('em_booking_get_price', $this->booking_price, $this);
 		}
 		//return booking_price, formatted or not
@@ -368,17 +409,21 @@ class EM_Booking extends EM_Object{
 	 * @return double|string
 	 */
 	function get_price_base( $format = false ){
-	    $price = $this->get_tickets_bookings()->get_price();
+	    $price = apply_filters('em_booking_get_price_base', $this->get_tickets_bookings()->get_price(), $this);
 		if($format){
 			return $this->format_price($price);
 		}
 	    return $price;
 	}
 	
-	function get_price_pre_taxes( $format = false ){
+	function get_price_pre_taxes( $format = false, $include_adjustments = true ){
 	    $price = $base_price = $this->get_price_base();
 	    //apply pre-tax discounts
-	    $price -= $this->get_price_discounts_amount('pre', $price);
+	    if( $include_adjustments ){
+		    $price -= $this->get_price_adjustments_amount('discounts', 'pre', $base_price);
+		    $price += $this->get_price_adjustments_amount('surcharges', 'pre', $base_price);
+	    }
+	    $price = apply_filters('em_booking_get_price_pre_taxes', $price, $base_price, $this, $include_adjustments);
 	    if( $price < 0 ){ $price = 0; } //no negative prices
 	    //return amount of taxes applied, formatted or not
 	    if( $format ) return $this->format_price($price);
@@ -386,13 +431,14 @@ class EM_Booking extends EM_Object{
 	}
 	
 	/**
-	 * Gets price AFTER taxes and post-tax discounts have also been added
+	 * Gets price AFTER taxes and (optionally) post-tax discounts and surcharges have also been added.
 	 * @param boolean $format
+	 * @param boolean $include_adjustments If set to true discounts and surcharges won't be applied to the overall price.
 	 * @return double|string
 	 */
-	function get_price_post_taxes( $format = false ){
+	function get_price_post_taxes( $format = false, $include_adjustments = true ){
 	    //get price before taxes
-	    $price = $this->get_price_pre_taxes();
+	    $price = $this->get_price_pre_taxes( false, $include_adjustments );
 	    //add taxes to price
 	    if( $this->get_tax_rate() > 0 ){
 	        $this->booking_taxes = $price * ($this->get_tax_rate()/100); //calculate and save tax amount
@@ -400,7 +446,12 @@ class EM_Booking extends EM_Object{
 		    $this->taxes_applied = true;
 	    }
 	    //apply post-tax discounts
-	    $price -= $this->get_price_discounts_amount('post', $price);
+	    $price_after_taxes = $price;
+	    if( $include_adjustments ){
+		    $price -= $this->get_price_adjustments_amount('discounts', 'post', $price_after_taxes);
+		    $price += $this->get_price_adjustments_amount('surcharges', 'post', $price_after_taxes);
+	    }
+	    $price = apply_filters('em_booking_get_price_post_taxes', $price, $price_after_taxes, $this, $include_adjustments);
 	    if( $price < 0 ){ $price = 0; } //no negative prices
 	    //return amount of taxes applied, formatted or not
 	    if( $format ) return $this->format_price($price);
@@ -425,15 +476,13 @@ class EM_Booking extends EM_Object{
 	    return $this->booking_taxes;
 	}
 	
-	function get_price_discount(){
-	    
-	}
-	
 	/**
 	 * Calculates (or recalculates) the price of this booking including taxes, discounts etc., saves it to the booking_price property and writes to relevant properties booking_meta variables
 	 * @return double
 	 */
 	function calculate_price(){
+		//any programatic price adjustments should be added here, otherwise you need to run this function again
+		do_action('em_booking_pre_calculate_price', $this);
 	    //reset price and taxes calculations
 	    $this->booking_price = $this->booking_taxes = null;
 	    //get post-tax price and save it to booking_price
@@ -444,9 +493,8 @@ class EM_Booking extends EM_Object{
 	/* 
 	 * Gets tax rate of booking
 	 * @see EM_Object::get_tax_rate()
-	 * @return double
 	 */
-	function get_tax_rate(){
+	function get_tax_rate( $decimal = false ){
 	    if( $this->booking_tax_rate === null ){
 	        //booking not saved or tax never defined
 	        if( !empty($this->booking_id) && get_option('dbem_legacy_bookings_tax', 'x') !== 'x'){ //even if 0 if defined as tax rate we still use it, delete the option entirely to stop
@@ -465,66 +513,122 @@ class EM_Booking extends EM_Object{
 	            $this->booking_tax_rate = $this->get_event()->get_tax_rate();
 	        }
 	    }
-	    return $this->booking_tax_rate;
+	    $this->booking_tax_rate = $this->booking_tax_rate > 0 ? $this->booking_tax_rate : 0;
+	    $this->booking_tax_rate = apply_filters('em_booking_get_tax_rate', $this->booking_tax_rate, $this);
+	    if( $this->booking_tax_rate > 0 && $decimal ){
+	    	return $this->booking_tax_rate / 100;
+	    }else{
+		    return $this->booking_tax_rate;
+	    }
+	}
+	
+	/* START Price Adjustment Functions */
+	//now we can use one function for both discounts and surcharges, the three functions below are now deprecated.
+	/**
+	 * DEPRECATED. Use $this->get_price_adjustments('discounts'); instead.
+	 */
+	function get_price_discounts(){
+		return apply_filters('em_booking_get_price_discounts', $this->get_price_adjustments('discounts'), $this);
+	}
+	/**
+	 * DEPRECATED - Use $this->get_price_adjustments_amount('discounts', $pre_or_post, $price); instead.
+	 */
+	function get_price_discounts_amount( $pre_or_post = 'pre', $price = false ){
+		return $this->get_price_adjustments_amount( 'discounts', $pre_or_post, $price );
+	}
+	/**
+	 * DEPRECATED - Use get_price_discounts_summary('discounts', $pre_or_post, $price); instead.
+	 */
+	function get_price_discounts_summary( $pre_or_post = 'pre', $price = false ){
+		return $this->get_price_adjustments_summary( 'discounts', $pre_or_post, $price );
 	}
 	
 	/**
 	 * Returns an array of discounts to be applied to a booking. Here is an example of an array item that is expected:
 	 * array('name' => 'Name of Discount', 'type'=>'% or #', 'amount'=> 0.00, 'desc' => 'Comments about discount', 'tax'=>'pre/post', 'data' => 'any info for hooks to use' );
 	 * About the array keys:
-	 * type - $ means a fixed amount of discount, % means a percentage off the base price
+	 * type - # means a fixed amount of discount, % means a percentage off the base price
 	 * amount - if type is a percentage, it is written as a number from 0-100, e.g. 10 = 10%
 	 * tax - 'pre' means discount is applied before tax, 'post' means after tax
 	 * data - any data to be stored that can be used by actions/filters
+	 * @param string $type The type of adjustment you would like to retrieve. This would normally be 'discounts' or 'surcharges'.
 	 * @return array
 	 */
-	function get_price_discounts(){
-	    $discounts = array();
-	    if( !empty($this->booking_meta['discounts']) && is_array($this->booking_meta['discounts']) ){
-	        $discounts = $this->booking_meta['discounts'];
-	    }
-		return apply_filters('em_booking_get_price_discounts', $discounts, $this);
+	function get_price_adjustments( $type ){
+		$adjustments = array();
+		if( !empty($this->booking_meta[$type]) && is_array($this->booking_meta[$type]) ){
+			$adjustments = $this->booking_meta[$type];
+		}
+		//run this filter to be backwards compatible, e.g. em_booking_get_price_discount
+		if( $type == 'discounts' ){
+			$adjustments = apply_filters('em_booking_get_price_discounts', $adjustments, $this);
+		}
+		return apply_filters('em_booking_get_price_adjustments', $adjustments, $type, $this);
 	}
 	
-	function get_price_discounts_amount( $pre_or_post = 'pre', $price = false ){
-	    $discounts = $this->get_price_discounts_summary($pre_or_post, $price);
-	    $discount_amount = 0;
-	    foreach($discounts as $discount){
-	        $discount_amount += $discount['amount_discounted'];
-	    }
-	    return $discount_amount;
-	}
-
-	function get_price_discounts_summary( $pre_or_post = 'pre', $price = false ){
-		$discounts=  $this->get_price_discounts();
-		$discount_summary = array();
-		if( $price === false ){
-			$price = $this->get_price_base();
-			if( $pre_or_post == 'post' ) $price = $this->get_price_pre_taxes() + $this->get_price_taxes();
+	/**
+	 * Returns a numerical amount to adjust the price by, in the context of a certain type and before or after taxes.
+	 * This will be a positive number whether or not this is to be added or subtracted from the price.
+	 * @param string $type The type of adjustment to get, which would normally be 'discounts' or 'surcharges'
+	 * @param string $pre_or_post Adjustments limited to 'pre' (before), 'post' (after) taxes or 'both'
+	 * @param float $price Price relative to be adjusted.
+	 * @return float
+	 */
+	function get_price_adjustments_amount( $type, $pre_or_post = 'both', $price = false ){
+		$adjustments = $this->get_price_adjustments_summary($type, $pre_or_post, $price);
+		$adjustment_amount = 0;
+		foreach($adjustments as $adjustment){
+			$adjustment_amount += $adjustment['amount_adjusted'];
 		}
-		foreach($discounts as $discount){
-			$discount_amount = 0;
-			if( !empty($discount['amount']) ){
-				if( !empty($discount['tax']) && $discount['tax'] == $pre_or_post ){
-					if( !empty($discount['type']) ){
-						$discount_summary_item = array('name' => $discount['name'], 'desc' => $discount['desc'], 'discount'=>'0', 'amount_discounted'=>0);
-						if( $discount['type'] == '%' ){ //discount by percentage
-						    $discount_summary_item['amount_discounted'] = round($price * ($discount['amount']/100),2);
-						    $discount_summary_item['amount'] = $this->format_price($discount_summary_item['amount_discounted']);
-						    $discount_summary_item['discount'] = number_format($discount['amount'],2).'%';
-							$discount_summary[] = $discount_summary_item;
-						}elseif( $discount['type'] == '#' ){ //discount by amount
-						    $discount_summary_item['amount_discounted'] = round($discount['amount'],2);
-						    $discount_summary_item['amount'] = $this->format_price($discount_summary_item['amount_discounted']);
-						    $discount_summary_item['discount'] = $this->format_price($discount['amount']);
-							$discount_summary[] = $discount_summary_item;
+		return $adjustment_amount;
+	}
+	
+	/**
+	 * Provides an array summary of adjustments to make to the price, in the context of a certain type and before or after taxes.
+	 * @param string $type The type of adjustment to get, which would normally be 'discounts' or 'surcharges'
+	 * @param string $pre_or_post Adjustments limited to 'pre' (before), 'post' (after) taxes or 'both'
+	 * @param float $price Price to calculate relative to adjustments. If not supplied or if $pre_or_post is 'both', price is automatically obtained from booking instance according to pre/post taxes requirement. 
+	 * @return array
+	 */
+	function get_price_adjustments_summary( $type, $pre_or_post = 'both', $price = false ){
+		if( $pre_or_post == 'both' ){
+			$adjustment_summary_pre = $this->get_price_adjustments_summary($type, 'pre');
+			$adjustment_summary_post = $this->get_price_adjustments_summary($type, 'post'); 
+			return $adjustment_summary = array_merge($adjustment_summary_pre, $adjustment_summary_post);
+		}
+		$adjustments = $this->get_price_adjustments($type);
+		$adjustment_summary = array();
+		if( $price === false ){
+			if( $pre_or_post == 'post' ){
+				$price = $this->get_price_pre_taxes() + $this->get_price_taxes();
+			}else{
+				$price = $this->get_price_base();
+			}
+		}
+		foreach($adjustments as $adjustment){
+			$adjustment_amount = 0;
+			if( !empty($adjustment['amount']) ){
+				if( !empty($adjustment['tax']) && $adjustment['tax'] == $pre_or_post ){
+					if( !empty($adjustment['type']) ){
+						$adjustment_summary_item = array('name' => $adjustment['name'], 'desc' => $adjustment['desc'], 'adjustment'=>'0', 'amount_adjusted'=>0, 'tax'=>$pre_or_post);
+						if( $adjustment['type'] == '%' ){ //adjustment by percentage
+							$adjustment_summary_item['amount_adjusted'] = round($price * ($adjustment['amount']/100),2);
+							$adjustment_summary_item['amount'] = $this->format_price($adjustment_summary_item['amount_adjusted']);
+							$adjustment_summary_item['adjustment'] = number_format($adjustment['amount'],2).'%';
+							$adjustment_summary[] = $adjustment_summary_item;
+						}elseif( $adjustment['type'] == '#' ){ //adjustment by amount
+							$adjustment_summary_item['amount_adjusted'] = round($adjustment['amount'],2);
+							$adjustment_summary_item['amount'] = $this->format_price($adjustment_summary_item['amount_adjusted']);
+							$adjustment_summary_item['adjustment'] = $this->format_price($adjustment['amount']);
+							$adjustment_summary[] = $adjustment_summary_item;
 						}
 					}
 				}
 			}
 		}
-		return $discount_summary;
+		return $adjustment_summary;
 	}
+	/* END Price Adjustment Functions */
 	
 	/**
 	 * When generating totals at the bottom of a booking, this creates a useful array for displaying the summary in a meaningful way. 
@@ -533,37 +637,54 @@ class EM_Booking extends EM_Object{
 	    $summary = array();
 	    //get base price of bookings
 	    $summary['total_base'] = $this->get_price_base();
-	    //get discounts
 	    //apply pre-tax discounts
-	    $summary['discounts_pre_tax'] = $this->get_price_discounts_summary('pre');
+	    $summary['discounts_pre_tax'] = $this->get_price_adjustments_summary('discounts', 'pre');
+	    $summary['surcharges_pre_tax'] = $this->get_price_adjustments_summary('surcharges', 'pre');
 	    //add taxes to price
 		$summary['taxes'] = array('rate'=> 0, 'amount'=> 0);
 	    if( $this->get_price_taxes() > 0 ){
 		    $summary['taxes'] = array('rate'=> number_format($this->get_tax_rate(),2, get_option('dbem_bookings_currency_decimal_point'), get_option('dbem_bookings_currency_thousands_sep')).'%', 'amount'=> $this->get_price_taxes(true));
 	    }
 	    //apply post-tax discounts
-	    $summary['discounts_post_tax'] = $this->get_price_discounts_summary('post');
+	    $summary['discounts_post_tax'] = $this->get_price_adjustments_summary('discounts', 'post');
+	    $summary['surcharges_post_tax'] = $this->get_price_adjustments_summary('surcharges', 'post');
 	    //final price
 	    $summary['total'] =  $this->get_price(true);
 	    return $summary;
 	}
 	
+	/**
+	 * Returns the amount paid for this booking. By default, a booking is considered either paid in full or not at all depending on whether the booking is confirmed or not.
+	 * @param boolean $format If set to true a currency-formatted string value is returned
+	 * @return string|float
+	 */
+	function get_total_paid( $format = false ){
+		$status = ($this->booking_status == 0 && !get_option('dbem_bookings_approval') ) ? 1:$this->booking_status;
+		$total = $status ? $this->get_price() : 0;
+		$total = apply_filters('em_booking_get_total_paid', $total, $this);
+		if( $format ){
+			return $this->format_price($total);
+		}
+		return $total;
+	}
+	
+	
 	/* Get Objects linked to booking */
 	
 	/**
-	 * Gets the event this booking belongs to and saves a refernece in the event property
+	 * Gets the event this booking belongs to and saves a reference in the event property
 	 * @return EM_Event
 	 */
 	function get_event(){
 		global $EM_Event;
 		if( is_object($this->event) && get_class($this->event)=='EM_Event' && $this->event->event_id == $this->event_id ){
 			return $this->event;
-		}elseif( is_object($EM_Event) && ( (is_object($this->event) && $this->event->event_id == $this->event_id) || empty($this->booking_id)) ){
+		}elseif( is_object($EM_Event) && $EM_Event->event_id == $this->event_id ){
 			$this->event = $EM_Event;
 		}else{
-			$this->event = new EM_Event($this->event_id, 'event_id');
+			$this->event = em_get_event($this->event_id, 'event_id');
 		}
-		return apply_filters('em_booking_get_event',$this->event, $this);
+		return apply_filters('em_booking_get_event', $this->event, $this);
 	}
 	
 	/**
@@ -608,7 +729,7 @@ class EM_Booking extends EM_Object{
 			$this->person_id = $this->person->ID;
 		}
 		//if this user is the parent user of disabled registrations, replace user details here:
-		if( get_option('dbem_bookings_registration_disable') && $this->person->ID == get_option('dbem_bookings_registration_user') && (empty($this->person->loaded_no_user) || $this->person->loaded_no_user != $this->booking_id) ){
+		if( $this->person->ID === 0 && (empty($this->person->loaded_no_user) || $this->person->loaded_no_user != $this->booking_id) ){
 			//override any registration data into the person objet
 			if( !empty($this->booking_meta['registration']) ){
 				foreach($this->booking_meta['registration'] as $key => $value){
@@ -694,8 +815,6 @@ class EM_Booking extends EM_Object{
 		    }
 		    if( !empty($name_string) ) $user_data['user_name'] = implode(' ', $name_string);
 	    }
-	    //Save full name
-	    if( !empty($user_data['first_name']) || !empty($user_data['last_name']) )
 	    //Check the phone
 	    if( !empty($_REQUEST['dbem_phone']) ){
 	    	$user_data['dbem_phone'] = wp_kses(wp_unslash($_REQUEST['dbem_phone']), array());
@@ -721,9 +840,9 @@ class EM_Booking extends EM_Object{
 		$email = $this->get_person()->user_email;
 		$phone = ($this->get_person()->phone != __('Not Supplied','events-manager')) ? $this->get_person()->phone:'';
 		if( !empty($_REQUEST['action']) && $_REQUEST['action'] == 'booking_modify_person' ){
-		    $name = !empty($_REQUEST['user_name']) ? $_REQUEST['user_name']:$name;
-		    $email = !empty($_REQUEST['user_email']) ? $_REQUEST['user_email']:$email;
-		    $phone = !empty($_REQUEST['dbem_phone']) ? $_REQUEST['dbem_phone']:$phone;
+		    $name = !empty($_REQUEST['user_name']) ? sanitize_text_field($_REQUEST['user_name']):$name;
+		    $email = !empty($_REQUEST['user_email']) ? sanitize_email($_REQUEST['user_email']):$email;
+		    $phone = !empty($_REQUEST['dbem_phone']) ? sanitize_text_field($_REQUEST['dbem_phone']):$phone;
 		}
 		?>
 		<table class="em-form-fields">
@@ -771,7 +890,7 @@ class EM_Booking extends EM_Object{
 	
 	function cancel($email = true){
 		if( $this->person->ID == get_current_user_id() ){
-			$this->manage_override = true; //normally, users can't manage a bookiing, only event owners, so we allow them to mod their booking status in this case only.
+			$this->manage_override = true; //normally, users can't manage a booking, only event owners, so we allow them to mod their booking status in this case only.
 		}
 		return $this->set_status(3, $email);
 	}
@@ -819,7 +938,7 @@ class EM_Booking extends EM_Object{
 		$result = $wpdb->query($wpdb->prepare('UPDATE '.EM_BOOKINGS_TABLE.' SET booking_status=%d WHERE booking_id=%d', array($status, $this->booking_id)));
 		if($result !== false){
 			$this->feedback_message = sprintf(__('Booking %s.','events-manager'), $action_string);
-			if( $email ){
+			if( $email && $this->previous_status != $this->booking_status ){ //email if status has changed
 				if( $this->email() ){
 				    if( $this->mails_sent > 0 ){
 				        $this->feedback_message .= " ".__('Email Sent.','events-manager');
@@ -855,6 +974,14 @@ class EM_Booking extends EM_Object{
 	}
 	
 	/**
+	 * Returns true if booking is associated with a non-registered user, i.e. booked as a guest 'no user mode'.
+	 * @return mixed
+	 */
+	function is_no_user(){
+		return apply_filters('em_booking_is_no_user', $this->get_person()->ID === 0, $this);
+	}
+	
+	/**
 	 * Returns true if booking is either pending or reserved but not confirmed (which is assumed pending) 
 	 */
 	function is_pending(){
@@ -871,7 +998,7 @@ class EM_Booking extends EM_Object{
 		global $wpdb;
 		if( $this->can_manage() ){
 			$this->get_notes();
-			$note = array('author'=>get_current_user_id(),'note'=>$note_text,'timestamp'=>current_time('timestamp'));
+			$note = array('author'=>get_current_user_id(),'note'=>$note_text,'timestamp'=>time());
 			$this->notes[] = wp_kses_data($note);
 			$this->feedback_message = __('Booking note successfully added.','events-manager');
 			return $wpdb->insert(EM_META_TABLE, array('object_id'=>$this->booking_id, 'meta_key'=>'booking-note', 'meta_value'=> serialize($note)),array('%d','%s','%s'));
@@ -921,13 +1048,13 @@ class EM_Booking extends EM_Object{
 					$replace = $this->get_spaces();
 					break;
 				case '#_BOOKINGDATE':
-					$replace = ( $this->timestamp ) ? date_i18n(get_option('dbem_date_format'), $this->timestamp):'n/a';
+					$replace = ( $this->date() !== false ) ? $this->date()->i18n( em_get_date_format() ):'n/a';
 					break;
 				case '#_BOOKINGTIME':
-					$replace = ( $this->timestamp ) ? date_i18n(get_option('dbem_time_format'), $this->timestamp):'n/a';
+					$replace = ( $this->date() !== false ) ?  $this->date()->i18n( em_get_hour_format() ):'n/a';
 					break;
 				case '#_BOOKINGDATETIME':
-					$replace = ( $this->timestamp ) ? date_i18n(get_option('dbem_date_format').' '.get_option('dbem_time_format'), $this->timestamp):'n/a';
+					$replace = ( $this->date() !== false ) ? $this->date()->i18n( em_get_date_format().' '.em_get_hour_format()):'n/a';
 					break;
 				case '#_BOOKINGLISTURL':
 					$replace = em_get_my_bookings_url();
@@ -935,8 +1062,6 @@ class EM_Booking extends EM_Object{
 				case '#_COMMENT' : //deprecated
 				case '#_BOOKINGCOMMENT':
 					$replace = $this->booking_comment;
-					break;
-					$replace = $this->get_price(true); //if there's tax, it'll be added here
 					break;
 				case '#_BOOKINGPRICEWITHOUTTAX':
 					$replace = $this->format_price($this->get_price() - $this->get_price_taxes());
@@ -1011,12 +1136,11 @@ class EM_Booking extends EM_Object{
 		if( $this->booking_status !== $this->previous_status || $force_resend ){
 			//messages can be overridden just before being sent
 			$msg = $this->email_messages();
-			$output_type = get_option('dbem_smtp_html') ? 'html':'email';
 
 			//Send user (booker) emails
 			if( !empty($msg['user']['subject']) && $email_attendee ){
 				$msg['user']['subject'] = $this->output($msg['user']['subject'], 'raw');
-				$msg['user']['body'] = $this->output($msg['user']['body'], $output_type);
+				$msg['user']['body'] = $this->output($msg['user']['body'], 'email');
 				//Send to the person booking
 				if( !$this->email_send( $msg['user']['subject'], $msg['user']['body'], $this->get_person()->user_email) ){
 					$result = false;
@@ -1039,7 +1163,7 @@ class EM_Booking extends EM_Object{
 				if( !empty($admin_emails) ){
 					//Only gets sent if this is a pending booking, unless approvals are disabled.
 					$msg['admin']['subject'] = $this->output($msg['admin']['subject'],'raw');
-					$msg['admin']['body'] = $this->output($msg['admin']['body'], $output_type);
+					$msg['admin']['body'] = $this->output($msg['admin']['body'], 'email');
 					//email admins
 						if( !$this->email_send( $msg['admin']['subject'], $msg['admin']['body'], $admin_emails) && current_user_can('manage_options') ){
 							$this->errors[] = __('Confirmation email could not be sent to admin. Registrant should have gotten their email (only admin see this warning).','events-manager');
@@ -1089,6 +1213,32 @@ class EM_Booking extends EM_Object{
 	    		break;
 	    }
 	    return apply_filters('em_booking_email_messages', $msg, $this);
+	}
+	
+	/**
+	 * Returns an EM_DateTime representation of when booking was made in UTC timezone. If no valid date defined, false will be returned
+	 * @return EM_DateTime
+	 */
+	public function date( $utc_timezone = false ){
+		if( empty($this->date) || !$this->date->valid ){
+			if( !empty($this->booking_date ) ){
+			    $this->date = new EM_DateTime($this->booking_date, 'UTC');
+			}else{
+				//we retrn a date regardless but it's not based on a 'valid' booking date
+				$this->date = new EM_DateTime();
+				$this->date->valid = false;
+			}
+		}
+		//Set to UTC timezone if requested, local blog time by default
+		if( $utc_timezone ){
+			$timezone = 'UTC';
+		}else{
+			//we could set this to false but this way we might avoid creating a new timezone if it's already in this one
+			$timezone = get_option( 'timezone_string' );
+			if( !$timezone ) $timezone = get_option('gmt_offset');
+		}
+		$this->date->setTimezone($timezone);
+		return $this->date;
 	}
 	
 	/**
