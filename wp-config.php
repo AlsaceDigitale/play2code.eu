@@ -20,16 +20,13 @@ if( !defined('WPMU_PLUGIN_DIR') ) define( 'WPMU_PLUGIN_DIR', dirname(__FILE__).'
 
 // ** Réglages MySQL - Votre hébergeur doit vous fournir ces informations. ** //
 /** Nom de la base de données de WordPress. */
-define('DB_NAME', 'test_play2c_5334');
+$mysql_url = parse_url($_ENV["DATABASE_URL"]);
+$db = substr($mysql_url['path'], 1);
 
-/** Utilisateur de la base de données MySQL. */
-define('DB_USER', 'test_play2c_5334');
-
-/** Mot de passe de la base de données MySQL. */
-define('DB_PASSWORD', '7dk99SpTCVNxbP7PBW13');
-
-/** Adresse de l’hébergement MySQL. */
-define('DB_HOST', 'test-play2c-5334.mysql.dbs.appsdeck.eu:30973/test_play2c_5334');
+define('DB_NAME', $db);
+define('DB_USER', $mysql_url['user']);
+define('DB_PASSWORD', $mysql_url['pass']);
+define('DB_HOST', $mysql_url['host'] . ":" . $mysql_url['port']);
 
 /** Jeu de caractères à utiliser par la base de données lors de la création des tables. */
 define('DB_CHARSET', 'utf8');
@@ -38,6 +35,11 @@ define('DB_CHARSET', 'utf8');
   * N’y touchez que si vous savez ce que vous faites.
   */
 define('DB_COLLATE', '');
+
+define( 'S3_UPLOADS_BUCKET', $_ENV["S3_UPLOADS_BUCKET"]);
+define( 'S3_UPLOADS_REGION', $_ENV["S3_UPLOADS_REGION"]);
+define( 'S3_UPLOADS_KEY', $_ENV["S3_UPLOADS_KEY"]);
+define( 'S3_UPLOADS_SECRET', $_ENV["S3_UPLOADS_SECRET"]);
 
 /**#@+
  * Clés uniques d’authentification et salage.
@@ -93,6 +95,11 @@ if ( !defined('ABSPATH') )
 
 define('WPCACHEHOME', dirname(__FILE__) . '/wp-content/plugins/wp-super-cache/');
 define('WP_CACHE', true);
+
+if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')
+  $_SERVER['HTTPS'] = 'on';
+
+define('AUTOMATIC_UPDATER_DISABLED', true);
 
 /** Réglage des variables de WordPress et de ses fichiers inclus. */
 require_once(ABSPATH . 'wp-settings.php');
